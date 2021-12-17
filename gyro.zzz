@@ -1,0 +1,10 @@
+build_deps:
+  mbedtls:
+    local: ../zig-mbedtls
+    root: mbedtls.zig
+  libssh2:
+    local: ../zig-libssh2
+    root: libssh2.zig
+  zlib:
+    local: ../zig-zlib
+    root: zlib.zig
