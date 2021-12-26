@@ -14,6 +14,7 @@ pub fn globalCleanup() void {
 }
 
 pub const XferInfoFn = c.curl_xferinfo_callback;
+pub const WriteFn = c.curl_write_callback;
 
 pub const Easy = opaque {
     pub fn init() Error!*Easy {
@@ -35,9 +36,159 @@ pub const Easy = opaque {
     pub fn setSslVerifyPeer(self: *Easy, val: bool) Error!void {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_SSL_VERIFYPEER, @as(c_ulong, if (val) 1 else 0)));
     }
+
+    pub fn setWriteFn(self: *Easy, write: WriteFn) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_WRITEFUNCTION, write));
+    }
+
+    pub fn setWriteData(self: *Easy, data: anyopaque) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_WRITEDATA, data));
+    }
+
+    pub fn setXferInfoFn(self: *Easy, xfer: XferInfoFn) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_XFERINFOFUNCTION, xfer));
+    }
+
+    pub fn setXferInfoData(self: *Easy, data: anyopaque) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_XFERINFODATA, data));
+    }
+
+    pub fn perform(self: *Easy) Error!void {
+        return tryCurl(c.curl_easy_perform(self));
+    }
+
+    pub fn getResponseCode(self: *Easy) Error!isize {
+        var code: isize = undefined;
+        try tryCurl(c.curl_easy_getinfo(self, c.CURLINFO_RESPONSE_CODE, &code));
+        return code;
+    }
 };
 
-pub const Error = error{ UnsupportedProtocol, FailedInit, UrlMalformat, NotBuiltIn, CouldntResolveProxy, CouldntResolveHost, CounldntConnect, WeirdServerReply, RemoteAccessDenied, FtpAcceptFailed, FtpWeirdPassReply, FtpAcceptTimeout, FtpWeirdPasvReply, FtpWeird227Format, FtpCantGetHost, Http2, FtpCouldntSetType, PartialFile, FtpCouldntRetrFile, Obsolete20, QuoteError, HttpReturnedError, WriteError, Obsolete24, UploadFailed, ReadError, OutOfMemory, OperationTimeout, Obsolete29, FtpPortFailed, FtpCouldntUseRest, Obsolete32, RangeError, HttpPostError, SslConnectError, BadDownloadResume, FileCouldntReadFile, LdapCannotBind, LdapSearchFailed, Obsolete40, FunctionNotFound, AbortByCallback, BadFunctionArgument, Obsolete44, InterfaceFailed, Obsolete46, TooManyRedirects, UnknownOption, SetoptOptionSyntax, Obsolete50, Obsolete51, GotNothing, SslEngineNotfound, SslEngineSetfailed, SendError, RecvError, Obsolete57, SslCertproblem, SslCipher, PeerFailedVerification, BadContentEncoding, LdapInvalidUrl, FilesizeExceeded, UseSslFailed, SendFailRewind, SslEngineInitfailed, LoginDenied, TftpNotfound, TftpPerm, RemoteDiskFull, TftpIllegal, Tftp_Unknownid, RemoteFileExists, TftpNosuchuser, ConvFailed, ConvReqd, SslCacertBadfile, RemoteFileNotFound, Ssh, SslShutdownFailed, Again, SslCrlBadfile, SslIssuerError, FtpPretFailed, RtspCseqError, RtspSessionError, FtpBadFileList, ChunkFailed, NoConnectionAvailable, SslPinnedpubkeynotmatch, SslInvalidcertstatus, Http2Stream, RecursiveApiCall, AuthError, Http3, QuicConnectError, Proxy, SslClientCert, UnknownErrorCode };
+fn emptyWrite(ptr: ?[*]u8, size: usize, nmemb: usize, data: ?*anyopaque) callconv(.C) usize {
+    _ = ptr;
+    _ = data;
+    _ = size;
+
+    return nmemb;
+}
+
+test "https put" {
+    try globalInit();
+    defer globalCleanup();
+
+    var easy = try Easy.init();
+    defer easy.cleanup();
+
+    try easy.setUrl("https://example.com");
+    try easy.setSslVerifyPeer(false);
+    try easy.setWriteFn(emptyWrite);
+    try easy.perform();
+    const code = try easy.getResponseCode();
+
+    try std.testing.expectEqual(@as(isize, 200), code);
+}
+
+pub const Error = error{
+    UnsupportedProtocol,
+    FailedInit,
+    UrlMalformat,
+    NotBuiltIn,
+    CouldntResolveProxy,
+    CouldntResolveHost,
+    CounldntConnect,
+    WeirdServerReply,
+    RemoteAccessDenied,
+    FtpAcceptFailed,
+    FtpWeirdPassReply,
+    FtpAcceptTimeout,
+    FtpWeirdPasvReply,
+    FtpWeird227Format,
+    FtpCantGetHost,
+    Http2,
+    FtpCouldntSetType,
+    PartialFile,
+    FtpCouldntRetrFile,
+    Obsolete20,
+    QuoteError,
+    HttpReturnedError,
+    WriteError,
+    Obsolete24,
+    UploadFailed,
+    ReadError,
+    OutOfMemory,
+    OperationTimeout,
+    Obsolete29,
+    FtpPortFailed,
+    FtpCouldntUseRest,
+    Obsolete32,
+    RangeError,
+    HttpPostError,
+    SslConnectError,
+    BadDownloadResume,
+    FileCouldntReadFile,
+    LdapCannotBind,
+    LdapSearchFailed,
+    Obsolete40,
+    FunctionNotFound,
+    AbortByCallback,
+    BadFunctionArgument,
+    Obsolete44,
+    InterfaceFailed,
+    Obsolete46,
+    TooManyRedirects,
+    UnknownOption,
+    SetoptOptionSyntax,
+    Obsolete50,
+    Obsolete51,
+    GotNothing,
+    SslEngineNotfound,
+    SslEngineSetfailed,
+    SendError,
+    RecvError,
+    Obsolete57,
+    SslCertproblem,
+    SslCipher,
+    PeerFailedVerification,
+    BadContentEncoding,
+    LdapInvalidUrl,
+    FilesizeExceeded,
+    UseSslFailed,
+    SendFailRewind,
+    SslEngineInitfailed,
+    LoginDenied,
+    TftpNotfound,
+    TftpPerm,
+    RemoteDiskFull,
+    TftpIllegal,
+    Tftp_Unknownid,
+    RemoteFileExists,
+    TftpNosuchuser,
+    ConvFailed,
+    ConvReqd,
+    SslCacertBadfile,
+    RemoteFileNotFound,
+    Ssh,
+    SslShutdownFailed,
+    Again,
+    SslCrlBadfile,
+    SslIssuerError,
+    FtpPretFailed,
+    RtspCseqError,
+    RtspSessionError,
+    FtpBadFileList,
+    ChunkFailed,
+    NoConnectionAvailable,
+    SslPinnedpubkeynotmatch,
+    SslInvalidcertstatus,
+    Http2Stream,
+    RecursiveApiCall,
+    AuthError,
+    Http3,
+    QuicConnectError,
+    Proxy,
+    SslClientCert,
+    UnknownErrorCode,
+};
 
 fn tryCurl(code: c.CURLcode) Error!void {
     if (code != c.CURLE_OK)

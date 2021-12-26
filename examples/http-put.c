@@ -18,6 +18,7 @@ int main(void)
     curl_easy_setopt(curl, CURLOPT_URL, "https://example.com");
     /* Now specify the POST data */
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "name=daniel&project=curl");
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); 
  
     /* Perform the request, res will get the return code */
     res = curl_easy_perform(curl);

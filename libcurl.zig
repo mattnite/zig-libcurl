@@ -16,11 +16,36 @@ pub const include_dir = pathJoinRoot(&.{ "c", "include" });
 const config_dir = pathJoinRoot(&.{"config"});
 const lib_dir = pathJoinRoot(&.{ "c", "lib" });
 
+pub const Options = struct {
+    zlib_include_dir: ?[]const u8 = null,
+    libssh2_include_dir: ?[]const u8 = null,
+    mbedtls_include_dir: ?[]const u8 = null,
+};
+
+pub const Define = struct {
+    key: []const u8,
+    value: ?[]const u8,
+};
+
+pub const Library = struct {
+    exported_defines: []Define,
+    step: *std.build.LibExeObjStep,
+
+    pub fn link(self: Library, other: *std.build.LibExeObjStep) void {
+        for (self.exported_defines) |def|
+            other.defineCMacro(def.key, def.value);
+
+        other.addIncludeDir(include_dir);
+        other.linkLibrary(self.step);
+    }
+};
+
 pub fn create(
     b: *std.build.Builder,
     target: std.zig.CrossTarget,
     mode: std.builtin.Mode,
-) *std.build.LibExeObjStep {
+    opts: Options,
+) !Library {
     const ret = b.addStaticLibrary("curl", null);
     ret.setTarget(target);
     ret.setBuildMode(mode);
@@ -30,9 +55,25 @@ pub fn create(
     ret.addIncludeDir(lib_dir);
     ret.linkLibC();
 
+    if (opts.zlib_include_dir) |zlib_include|
+        ret.addIncludeDir(zlib_include);
+
+    if (opts.libssh2_include_dir) |libssh2_include|
+        ret.addIncludeDir(libssh2_include);
+
+    if (opts.mbedtls_include_dir) |mbedtls_include|
+        ret.addIncludeDir(mbedtls_include);
+
+    var exported_defines = std.ArrayList(Define).init(b.allocator);
+    defer exported_defines.deinit();
+
+    try exported_defines.append(.{ .key = "CURL_STATICLIB", .value = "1" });
+
     //ret.defineCMacro("HAVE_CONFIG_H", null);
     ret.defineCMacro("BUILDING_LIBCURL", null);
     //ret.defineCMacro("libcurl_EXPORTS", null);
+    // when not building a shared library
+    ret.defineCMacro("CURL_STATICLIB", "1");
 
     //ret.defineCMacro("STDC_HEADERS", null);
 
@@ -135,6 +176,9 @@ pub fn create(
     // disables verbose strings
     // #undef CURL_DISABLE_VERBOSE_STRINGS
 
+    if (target.isWindows())
+        return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
+
     // to make a symbol visible
     ret.defineCMacro("CURL_EXTERN_SYMBOL", "__attribute__ ((__visibility__ (\"default\"))");
     // Ensure using CURL_EXTERN_SYMBOL is possible
@@ -148,14 +192,12 @@ pub fn create(
     // Use Windows LDAP implementation
     // #undef USE_WIN32_LDAP
 
-    // when not building a shared library
-    ret.defineCMacro("CURL_STATICLIB", "1");
-
     // your Entropy Gathering Daemon socket pathname
     // #undef EGD_SOCKET
 
     // Define if you want to enable IPv6 support
-    ret.defineCMacro("ENABLE_IPV6", "1");
+    if (!target.isDarwin())
+        ret.defineCMacro("ENABLE_IPV6", "1");
 
     // Define to 1 if you have the alarm function.
     ret.defineCMacro("HAVE_ALARM", "1");
@@ -224,7 +266,8 @@ pub fn create(
     ret.defineCMacro("HAVE_GETHOSTBYNAME", "1");
 
     // Define to 1 if you have the gethostbyname_r function.
-    ret.defineCMacro("HAVE_GETHOSTBYNAME_R", "1");
+    if (!target.isDarwin())
+        ret.defineCMacro("HAVE_GETHOSTBYNAME_R", "1");
 
     // gethostbyname_r() takes 3 args
     // #undef HAVE_GETHOSTBYNAME_R_3
@@ -435,7 +478,8 @@ pub fn create(
     ret.defineCMacro("HAVE_MEMORY_H", "1");
 
     // Define to 1 if you have the MSG_NOSIGNAL flag.
-    ret.defineCMacro("HAVE_MSG_NOSIGNAL", "1");
+    if (!target.isDarwin())
+        ret.defineCMacro("HAVE_MSG_NOSIGNAL", "1");
 
     // Define to 1 if you have the <netdb.h> header file.
     ret.defineCMacro("HAVE_NETDB_H", "1");
@@ -447,7 +491,8 @@ pub fn create(
     ret.defineCMacro("HAVE_NETINET_TCP_H", "1");
 
     // Define to 1 if you have the <linux/tcp.h> header file.
-    ret.defineCMacro("HAVE_LINUX_TCP_H", "1");
+    if (target.isLinux())
+        ret.defineCMacro("HAVE_LINUX_TCP_H", "1");
 
     // Define to 1 if you have the <net/if.h> header file.
     ret.defineCMacro("HAVE_NET_IF_H", "1");
@@ -1024,7 +1069,7 @@ pub fn create(
     // to make the compiler know the prototypes of Windows IDN APIs
     // #undef WANT_IDN_PROTOTYPES
 
-    return ret;
+    return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
 }
 
 const srcs = blk: {
