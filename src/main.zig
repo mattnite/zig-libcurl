@@ -90,6 +90,7 @@ test "https put" {
     try easy.setUrl("https://example.com");
     try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(emptyWrite);
+    try easy.setVerbose(true);
     try easy.perform();
     const code = try easy.getResponseCode();
 

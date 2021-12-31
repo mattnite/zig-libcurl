@@ -54,6 +54,12 @@ pub fn create(
     defer exported_defines.deinit();
 
     try exported_defines.append(.{ .key = "CURL_STATICLIB", .value = "1" });
+    if (target.isWindows()) {
+        // Define if you want to enable WIN32 threaded DNS lookup
+        //ret.defineCMacro("USE_THREADS_WIN32", "1");
+
+        return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
+    }
 
     //ret.defineCMacro("HAVE_CONFIG_H", null);
     ret.defineCMacro("BUILDING_LIBCURL", null);
@@ -176,13 +182,6 @@ pub fn create(
 
     // if you have the zlib.h header file
     ret.defineCMacro("HAVE_ZLIB_H", "1");
-
-    if (target.isWindows()) {
-        // Define if you want to enable WIN32 threaded DNS lookup
-        ret.defineCMacro("USE_THREADS_WIN32", "1");
-
-        return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
-    }
 
     // to make a symbol visible
     ret.defineCMacro("CURL_EXTERN_SYMBOL", "__attribute__ ((__visibility__ (\"default\"))");
