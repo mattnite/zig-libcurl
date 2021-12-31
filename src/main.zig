@@ -53,6 +53,10 @@ pub const Easy = opaque {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_XFERINFODATA, data));
     }
 
+    pub fn setErrorBuffer(self: *Easy, data: *[c.CURL_ERROR_SIZE]u8) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_XFERINFODATA, data));
+    }
+
     pub fn perform(self: *Easy) Error!void {
         return tryCurl(c.curl_easy_perform(self));
     }
@@ -76,14 +80,17 @@ test "https put" {
     try globalInit();
     defer globalCleanup();
 
+    var error_buf: [c.CURL_ERROR_SIZE]u8 = undefined;
+
     var easy = try Easy.init();
     defer easy.cleanup();
 
     try easy.setUrl("https://example.com");
     try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(emptyWrite);
+    try easy.setErrorBuffer(&error_buf);
     easy.perform() catch |err| {
-        std.log.err("{s}", .{c.curl_easy_strerror(curlFromError(err))});
+        std.log.err("{s}", .{@ptrCast([*:0]const u8, &error_buf)});
         return err;
     };
     const code = try easy.getResponseCode();
@@ -303,109 +310,5 @@ fn errorFromCurl(code: c.CURLcode) Error {
             std.debug.assert(false);
             break :blk error.UnknownErrorCode;
         },
-    };
-}
-
-fn curlFromError(err: Error) c.CURLcode {
-    return switch (err) {
-        error.UnsupportedProtocol => c.CURLE_UNSUPPORTED_PROTOCOL,
-        error.FailedInit => c.CURLE_FAILED_INIT,
-        error.UrlMalformat => c.CURLE_URL_MALFORMAT,
-        error.NotBuiltIn => c.CURLE_NOT_BUILT_IN,
-        error.CouldntResolveProxy => c.CURLE_COULDNT_RESOLVE_PROXY,
-        error.CouldntResolveHost => c.CURLE_COULDNT_RESOLVE_HOST,
-        error.CounldntConnect => c.CURLE_COULDNT_CONNECT,
-        error.WeirdServerReply => c.CURLE_WEIRD_SERVER_REPLY,
-        error.RemoteAccessDenied => c.CURLE_REMOTE_ACCESS_DENIED,
-        error.FtpAcceptFailed => c.CURLE_FTP_ACCEPT_FAILED,
-        error.FtpWeirdPassReply => c.CURLE_FTP_WEIRD_PASS_REPLY,
-        error.FtpAcceptTimeout => c.CURLE_FTP_ACCEPT_TIMEOUT,
-        error.FtpWeirdPasvReply => c.CURLE_FTP_WEIRD_PASV_REPLY,
-        error.FtpWeird227Format => c.CURLE_FTP_WEIRD_227_FORMAT,
-        error.FtpCantGetHost => c.CURLE_FTP_CANT_GET_HOST,
-        error.Http2 => c.CURLE_HTTP2,
-        error.FtpCouldntSetType => c.CURLE_FTP_COULDNT_SET_TYPE,
-        error.PartialFile => c.CURLE_PARTIAL_FILE,
-        error.FtpCouldntRetrFile => c.CURLE_FTP_COULDNT_RETR_FILE,
-        error.Obsolete20 => c.CURLE_OBSOLETE20,
-        error.QuoteError => c.CURLE_QUOTE_ERROR,
-        error.HttpReturnedError => c.CURLE_HTTP_RETURNED_ERROR,
-        error.WriteError => c.CURLE_WRITE_ERROR,
-        error.Obsolete24 => c.CURLE_OBSOLETE24,
-        error.UploadFailed => c.CURLE_UPLOAD_FAILED,
-        error.ReadError => c.CURLE_READ_ERROR,
-        error.OutOfMemory => c.CURLE_OUT_OF_MEMORY,
-        error.OperationTimeout => c.CURLE_OPERATION_TIMEDOUT,
-        error.Obsolete29 => c.CURLE_OBSOLETE29,
-        error.FtpPortFailed => c.CURLE_FTP_PORT_FAILED,
-        error.FtpCouldntUseRest => c.CURLE_FTP_COULDNT_USE_REST,
-        error.Obsolete32 => c.CURLE_OBSOLETE32,
-        error.RangeError => c.CURLE_RANGE_ERROR,
-        error.HttpPostError => c.CURLE_HTTP_POST_ERROR,
-        error.SslConnectError => c.CURLE_SSL_CONNECT_ERROR,
-        error.BadDownloadResume => c.CURLE_BAD_DOWNLOAD_RESUME,
-        error.FileCouldntReadFile => c.CURLE_FILE_COULDNT_READ_FILE,
-        error.LdapCannotBind => c.CURLE_LDAP_CANNOT_BIND,
-        error.LdapSearchFailed => c.CURLE_LDAP_SEARCH_FAILED,
-        error.Obsolete40 => c.CURLE_OBSOLETE40,
-        error.FunctionNotFound => c.CURLE_FUNCTION_NOT_FOUND,
-        error.AbortByCallback => c.CURLE_ABORTED_BY_CALLBACK,
-        error.BadFunctionArgument => c.CURLE_BAD_FUNCTION_ARGUMENT,
-        error.Obsolete44 => c.CURLE_OBSOLETE44,
-        error.InterfaceFailed => c.CURLE_INTERFACE_FAILED,
-        error.Obsolete46 => c.CURLE_OBSOLETE46,
-        error.TooManyRedirects => c.CURLE_TOO_MANY_REDIRECTS,
-        error.UnknownOption => c.CURLE_UNKNOWN_OPTION,
-        error.SetoptOptionSyntax => c.CURLE_SETOPT_OPTION_SYNTAX,
-        error.Obsolete50 => c.CURLE_OBSOLETE50,
-        error.Obsolete51 => c.CURLE_OBSOLETE51,
-        error.GotNothing => c.CURLE_GOT_NOTHING,
-        error.SslEngineNotfound => c.CURLE_SSL_ENGINE_NOTFOUND,
-        error.SslEngineSetfailed => c.CURLE_SSL_ENGINE_SETFAILED,
-        error.SendError => c.CURLE_SEND_ERROR,
-        error.RecvError => c.CURLE_RECV_ERROR,
-        error.Obsolete57 => c.CURLE_OBSOLETE57,
-        error.SslCertproblem => c.CURLE_SSL_CERTPROBLEM,
-        error.SslCipher => c.CURLE_SSL_CIPHER,
-        error.PeerFailedVerification => c.CURLE_PEER_FAILED_VERIFICATION,
-        error.BadContentEncoding => c.CURLE_BAD_CONTENT_ENCODING,
-        error.LdapInvalidUrl => c.CURLE_LDAP_INVALID_URL,
-        error.FilesizeExceeded => c.CURLE_FILESIZE_EXCEEDED,
-        error.UseSslFailed => c.CURLE_USE_SSL_FAILED,
-        error.SendFailRewind => c.CURLE_SEND_FAIL_REWIND,
-        error.SslEngineInitfailed => c.CURLE_SSL_ENGINE_INITFAILED,
-        error.LoginDenied => c.CURLE_LOGIN_DENIED,
-        error.TftpNotfound => c.CURLE_TFTP_NOTFOUND,
-        error.TftpPerm => c.CURLE_TFTP_PERM,
-        error.RemoteDiskFull => c.CURLE_REMOTE_DISK_FULL,
-        error.TftpIllegal => c.CURLE_TFTP_ILLEGAL,
-        error.Tftp_Unknownid => c.CURLE_TFTP_UNKNOWNID,
-        error.RemoteFileExists => c.CURLE_REMOTE_FILE_EXISTS,
-        error.TftpNosuchuser => c.CURLE_TFTP_NOSUCHUSER,
-        error.ConvFailed => c.CURLE_CONV_FAILED,
-        error.ConvReqd => c.CURLE_CONV_REQD,
-        error.SslCacertBadfile => c.CURLE_SSL_CACERT_BADFILE,
-        error.RemoteFileNotFound => c.CURLE_REMOTE_FILE_NOT_FOUND,
-        error.Ssh => c.CURLE_SSH,
-        error.SslShutdownFailed => c.CURLE_SSL_SHUTDOWN_FAILED,
-        error.Again => c.CURLE_AGAIN,
-        error.SslCrlBadfile => c.CURLE_SSL_CRL_BADFILE,
-        error.SslIssuerError => c.CURLE_SSL_ISSUER_ERROR,
-        error.FtpPretFailed => c.CURLE_FTP_PRET_FAILED,
-        error.RtspCseqError => c.CURLE_RTSP_CSEQ_ERROR,
-        error.RtspSessionError => c.CURLE_RTSP_SESSION_ERROR,
-        error.FtpBadFileList => c.CURLE_FTP_BAD_FILE_LIST,
-        error.ChunkFailed => c.CURLE_CHUNK_FAILED,
-        error.NoConnectionAvailable => c.CURLE_NO_CONNECTION_AVAILABLE,
-        error.SslPinnedpubkeynotmatch => c.CURLE_SSL_PINNEDPUBKEYNOTMATCH,
-        error.SslInvalidcertstatus => c.CURLE_SSL_INVALIDCERTSTATUS,
-        error.Http2Stream => c.CURLE_HTTP2_STREAM,
-        error.RecursiveApiCall => c.CURLE_RECURSIVE_API_CALL,
-        error.AuthError => c.CURLE_AUTH_ERROR,
-        error.Http3 => c.CURLE_HTTP3,
-        error.QuicConnectError => c.CURLE_QUIC_CONNECT_ERROR,
-        error.Proxy => c.CURLE_PROXY,
-        error.SslClientCert => c.CURLE_SSL_CLIENTCERT,
-        else => unreachable,
     };
 }
