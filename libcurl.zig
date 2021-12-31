@@ -162,6 +162,21 @@ pub fn create(
     // disables verbose strings
     // #undef CURL_DISABLE_VERBOSE_STRINGS
 
+    // if mbedTLS is enabled
+    ret.defineCMacro("USE_MBEDTLS", "1");
+
+    // Define to 1 if you have the `ssh2' library (-lssh2).
+    ret.defineCMacro("HAVE_LIBSSH2", "1");
+
+    // Define to 1 if you have the <libssh2.h> header file.
+    ret.defineCMacro("HAVE_LIBSSH2_H", "1");
+
+    // Define to 1 if you have the <libssh/libssh.h> header file.
+    // #undef HAVE_LIBSSH_LIBSSH_H
+
+    // if zlib is available
+    ret.defineCMacro("HAVE_LIBZ", "1");
+
     if (target.isWindows())
         return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
 
@@ -426,18 +441,6 @@ pub fn create(
 
     // Define to 1 if you have the `socket' library (-lsocket).
     // #undef HAVE_LIBSOCKET
-
-    // Define to 1 if you have the `ssh2' library (-lssh2).
-    ret.defineCMacro("HAVE_LIBSSH2", "1");
-
-    // Define to 1 if you have the <libssh2.h> header file.
-    ret.defineCMacro("HAVE_LIBSSH2_H", "1");
-
-    // Define to 1 if you have the <libssh/libssh.h> header file.
-    // #undef HAVE_LIBSSH_LIBSSH_H
-
-    // if zlib is available
-    ret.defineCMacro("HAVE_LIBZ", "1");
 
     // if brotli is available
     // #undef HAVE_BROTLI
@@ -943,9 +946,6 @@ pub fn create(
 
     // if Secure Transport is enabled
     // #undef USE_SECTRANSP
-
-    // if mbedTLS is enabled
-    ret.defineCMacro("USE_MBEDTLS", "1");
 
     // if BearSSL is enabled
     // #undef USE_BEARSSL
