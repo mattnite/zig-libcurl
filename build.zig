@@ -11,7 +11,12 @@ pub fn build(b: *std.build.Builder) !void {
     const z = zlib.create(b, target, mode);
     const tls = mbedtls.create(b, target, mode);
     const ssh2 = libssh2.create(b, target, mode);
+    tls.link(ssh2.step);
+
     const curl = try libcurl.create(b, target, mode);
+    ssh2.link(curl.step);
+    tls.link(curl.step);
+    z.link(curl.step, .{});
     curl.step.install();
 
     const tests = b.addTest("src/main.zig");

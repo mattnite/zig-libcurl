@@ -7,6 +7,7 @@ fn root() []const u8 {
 const root_path = root() ++ "/";
 
 pub const include_dir = root_path ++ "curl/include";
+const package_path = root_path ++ "src/main.zig";
 const config_dir = root_path ++ "config";
 const lib_dir = root_path ++ "curl/lib";
 
@@ -15,16 +16,23 @@ pub const Define = struct {
     value: ?[]const u8,
 };
 
+pub const Options = struct {
+    import_name: ?[]const u8 = null,
+};
+
 pub const Library = struct {
     exported_defines: []Define,
     step: *std.build.LibExeObjStep,
 
-    pub fn link(self: Library, other: *std.build.LibExeObjStep) void {
+    pub fn link(self: Library, other: *std.build.LibExeObjStep, opts: Options) void {
         for (self.exported_defines) |def|
             other.defineCMacro(def.key, def.value);
 
         other.addIncludeDir(include_dir);
         other.linkLibrary(self.step);
+
+        if (opts.import_name) |import_name|
+            other.addPackagePath(import_name, package_path);
     }
 };
 
