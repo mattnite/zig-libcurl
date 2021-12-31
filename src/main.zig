@@ -84,20 +84,13 @@ test "https put" {
     try globalInit();
     defer globalCleanup();
 
-    var error_buf: [c.CURL_ERROR_SIZE]u8 = undefined;
-
     var easy = try Easy.init();
     defer easy.cleanup();
 
     try easy.setUrl("https://example.com");
     try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(emptyWrite);
-    try easy.setErrorBuffer(&error_buf);
-    try easy.setVerbose(true);
-    easy.perform() catch |err| {
-        std.log.err("{s}", .{@ptrCast([*:0]const u8, &error_buf)});
-        return err;
-    };
+    try easy.perform();
     const code = try easy.getResponseCode();
 
     try std.testing.expectEqual(@as(isize, 200), code);
