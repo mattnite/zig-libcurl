@@ -179,7 +179,7 @@ pub fn create(
 
     if (target.isWindows()) {
         // Define if you want to enable WIN32 threaded DNS lookup
-        ret.defineCMacro("USE_THREADS_WIN32", "1");
+        //ret.defineCMacro("USE_THREADS_WIN32", "1");
 
         return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
     }
