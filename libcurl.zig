@@ -171,14 +171,18 @@ pub fn create(
     // Define to 1 if you have the <libssh2.h> header file.
     ret.defineCMacro("HAVE_LIBSSH2_H", "1");
 
-    // Define to 1 if you have the <libssh/libssh.h> header file.
-    // #undef HAVE_LIBSSH_LIBSSH_H
-
     // if zlib is available
     ret.defineCMacro("HAVE_LIBZ", "1");
 
-    if (target.isWindows())
+    // if you have the zlib.h header file
+    ret.defineCMacro("HAVE_ZLIB_H", "1");
+
+    if (target.isWindows()) {
+        // Define if you want to enable WIN32 threaded DNS lookup
+        ret.defineCMacro("USE_THREADS_WIN32", "1");
+
         return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
+    }
 
     // to make a symbol visible
     ret.defineCMacro("CURL_EXTERN_SYMBOL", "__attribute__ ((__visibility__ (\"default\"))");
@@ -492,27 +496,6 @@ pub fn create(
     // if you have an old MIT gssapi library, lacking GSS_C_NT_HOSTBASED_SERVICE
     // #undef HAVE_OLD_GSSMIT
 
-    // Define to 1 if you have the <openssl/crypto.h> header file.
-    // #undef HAVE_OPENSSL_CRYPTO_H
-
-    // Define to 1 if you have the <openssl/err.h> header file.
-    // #undef HAVE_OPENSSL_ERR_H
-
-    // Define to 1 if you have the <openssl/pem.h> header file.
-    // #undef HAVE_OPENSSL_PEM_H
-
-    // Define to 1 if you have the <openssl/pkcs12.h> header file.
-    // #undef HAVE_OPENSSL_PKCS12_H
-
-    // Define to 1 if you have the <openssl/rsa.h> header file.
-    // #undef HAVE_OPENSSL_RSA_H
-
-    // Define to 1 if you have the <openssl/ssl.h> header file.
-    // #undef HAVE_OPENSSL_SSL_H
-
-    // Define to 1 if you have the <openssl/x509.h> header file.
-    // #undef HAVE_OPENSSL_X509_H
-
     // Define to 1 if you have the <pem.h> header file.
     // #undef HAVE_PEM_H
 
@@ -605,9 +588,6 @@ pub fn create(
 
     // Define to 1 if you have the `socket' function.
     ret.defineCMacro("HAVE_SOCKET", "1");
-
-    // Define to 1 if you have the <ssl.h> header file.
-    // #undef HAVE_SSL_H
 
     // Define to 1 if you have the <stdbool.h> header file.
     ret.defineCMacro("HAVE_STDBOOL_H", "1");
@@ -774,9 +754,6 @@ pub fn create(
     // Define if you have the <process.h> header file.
     // #undef HAVE_PROCESS_H
 
-    // if you have the zlib.h header file
-    ret.defineCMacro("HAVE_ZLIB_H", "1");
-
     // Define to the sub-directory in which libtool stores uninstalled libraries.
 
     // #undef LT_OBJDIR
@@ -938,24 +915,6 @@ pub fn create(
     // Define if you want to enable POSIX threaded DNS lookup
     ret.defineCMacro("USE_THREADS_POSIX", "1");
 
-    // Define if you want to enable WIN32 threaded DNS lookup
-    // #undef USE_THREADS_WIN32
-
-    // if GnuTLS is enabled
-    // #undef USE_GNUTLS
-
-    // if Secure Transport is enabled
-    // #undef USE_SECTRANSP
-
-    // if BearSSL is enabled
-    // #undef USE_BEARSSL
-
-    // if WolfSSL is enabled
-    // #undef USE_WOLFSSL
-
-    // if libSSH is in use
-    // #undef USE_LIBSSH
-
     // if libSSH2 is in use
     ret.defineCMacro("USE_LIBSSH2", "1");
 
@@ -970,13 +929,6 @@ pub fn create(
 
     // if you want to use OpenLDAP code instead of legacy ldap implementation
     // #undef USE_OPENLDAP
-
-    // if OpenSSL is in use
-    // #undef USE_OPENSSL
-
-    // Define to 1 if you don't want the OpenSSL configuration to be loaded
-    // automatically
-    // #undef CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG
 
     // to enable NGHTTP2
     // #undef USE_NGHTTP2
