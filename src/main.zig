@@ -33,6 +33,10 @@ pub const Easy = opaque {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_FOLLOWLOCATION, @as(c_ulong, if (val) 1 else 0)));
     }
 
+    pub fn setVerbose(self: *Easy, val: bool) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_VERBOSE, @as(c_ulong, if (val) 1 else 0)));
+    }
+
     pub fn setSslVerifyPeer(self: *Easy, val: bool) Error!void {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_SSL_VERIFYPEER, @as(c_ulong, if (val) 1 else 0)));
     }
@@ -89,6 +93,7 @@ test "https put" {
     try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(emptyWrite);
     try easy.setErrorBuffer(&error_buf);
+    try easy.setVerbose(true);
     easy.perform() catch |err| {
         std.log.err("{s}", .{@ptrCast([*:0]const u8, &error_buf)});
         return err;
