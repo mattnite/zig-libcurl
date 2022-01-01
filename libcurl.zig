@@ -8,7 +8,6 @@ const root_path = root() ++ "/";
 
 pub const include_dir = root_path ++ "curl/include";
 const package_path = root_path ++ "src/main.zig";
-const config_dir = root_path ++ "config";
 const lib_dir = root_path ++ "curl/lib";
 
 pub const Define = struct {
@@ -44,9 +43,8 @@ pub fn create(
     const ret = b.addStaticLibrary("curl", null);
     ret.setTarget(target);
     ret.setBuildMode(mode);
-    ret.addCSourceFiles(srcs, &.{"-fno-sanitize=all"});
+    ret.addCSourceFiles(srcs, &.{});
     ret.addIncludeDir(include_dir);
-    //ret.addIncludeDir(config_dir);
     ret.addIncludeDir(lib_dir);
     ret.linkLibC();
 
