@@ -65,6 +65,9 @@ pub fn create(
     // disables LDAPS
     ret.defineCMacro("CURL_DISABLE_LDAPS", "1");
 
+    // if mbedTLS is enabled
+    ret.defineCMacro("USE_MBEDTLS", "1");
+
     if (target.isWindows()) {
         // Define if you want to enable WIN32 threaded DNS lookup
         //ret.defineCMacro("USE_THREADS_WIN32", "1");
@@ -168,9 +171,6 @@ pub fn create(
 
     // disables verbose strings
     // #undef CURL_DISABLE_VERBOSE_STRINGS
-
-    // if mbedTLS is enabled
-    ret.defineCMacro("USE_MBEDTLS", "1");
 
     // Define to 1 if you have the `ssh2' library (-lssh2).
     ret.defineCMacro("HAVE_LIBSSH2", "1");
