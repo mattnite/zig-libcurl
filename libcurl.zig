@@ -53,7 +53,10 @@ pub fn create(
     var exported_defines = std.ArrayList(Define).init(b.allocator);
     defer exported_defines.deinit();
 
+    // when not building a shared library
+    ret.defineCMacro("CURL_STATICLIB", "1");
     try exported_defines.append(.{ .key = "CURL_STATICLIB", .value = "1" });
+
     if (target.isWindows()) {
         // Define if you want to enable WIN32 threaded DNS lookup
         //ret.defineCMacro("USE_THREADS_WIN32", "1");
@@ -64,8 +67,6 @@ pub fn create(
     //ret.defineCMacro("HAVE_CONFIG_H", null);
     ret.defineCMacro("BUILDING_LIBCURL", null);
     //ret.defineCMacro("libcurl_EXPORTS", null);
-    // when not building a shared library
-    ret.defineCMacro("CURL_STATICLIB", "1");
 
     //ret.defineCMacro("STDC_HEADERS", null);
 
