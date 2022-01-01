@@ -59,6 +59,12 @@ pub fn create(
     ret.defineCMacro("CURL_STATICLIB", "1");
     try exported_defines.append(.{ .key = "CURL_STATICLIB", .value = "1" });
 
+    // disables LDAP
+    ret.defineCMacro("CURL_DISABLE_LDAP", "1");
+
+    // disables LDAPS
+    ret.defineCMacro("CURL_DISABLE_LDAPS", "1");
+
     if (target.isWindows()) {
         // Define if you want to enable WIN32 threaded DNS lookup
         //ret.defineCMacro("USE_THREADS_WIN32", "1");
@@ -114,12 +120,6 @@ pub fn create(
 
     // disables IMAP
     ret.defineCMacro("CURL_DISABLE_IMAP", "1");
-
-    // disables LDAP
-    ret.defineCMacro("CURL_DISABLE_LDAP", "1");
-
-    // disables LDAPS
-    ret.defineCMacro("CURL_DISABLE_LDAPS", "1");
 
     // disables --libcurl option from the curl tool
     // #undef CURL_DISABLE_LIBCURL_OPTION
