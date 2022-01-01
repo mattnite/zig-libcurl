@@ -66,29 +66,6 @@ pub fn create(
     // if mbedTLS is enabled
     ret.defineCMacro("USE_MBEDTLS", "1");
 
-    if (target.isWindows()) {
-        // Define if you want to enable WIN32 threaded DNS lookup
-        //ret.defineCMacro("USE_THREADS_WIN32", "1");
-
-        return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
-    }
-
-    //ret.defineCMacro("libcurl_EXPORTS", null);
-
-    //ret.defineCMacro("STDC_HEADERS", null);
-
-    // when building libcurl itself
-    // #undef BUILDING_LIBCURL
-
-    // Location of default ca bundle
-    // ret.defineCMacro("CURL_CA_BUNDLE", "\"/etc/ssl/certs/ca-certificates.crt\"");
-
-    // define "1" to use built-in ca store of TLS backend
-    // #undef CURL_CA_FALLBACK
-
-    // Location of default ca path
-    // ret.defineCMacro("CURL_CA_PATH", "\"/etc/ssl/certs\"");
-
     // disables alt-svc
     // #undef CURL_DISABLE_ALTSVC
 
@@ -181,6 +158,29 @@ pub fn create(
 
     // if you have the zlib.h header file
     ret.defineCMacro("HAVE_ZLIB_H", "1");
+
+    if (target.isWindows()) {
+        // Define if you want to enable WIN32 threaded DNS lookup
+        //ret.defineCMacro("USE_THREADS_WIN32", "1");
+
+        return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
+    }
+
+    //ret.defineCMacro("libcurl_EXPORTS", null);
+
+    //ret.defineCMacro("STDC_HEADERS", null);
+
+    // when building libcurl itself
+    // #undef BUILDING_LIBCURL
+
+    // Location of default ca bundle
+    // ret.defineCMacro("CURL_CA_BUNDLE", "\"/etc/ssl/certs/ca-certificates.crt\"");
+
+    // define "1" to use built-in ca store of TLS backend
+    // #undef CURL_CA_FALLBACK
+
+    // Location of default ca path
+    // ret.defineCMacro("CURL_CA_PATH", "\"/etc/ssl/certs\"");
 
     // to make a symbol visible
     ret.defineCMacro("CURL_EXTERN_SYMBOL", "__attribute__ ((__visibility__ (\"default\"))");
