@@ -1,5 +1,6 @@
 # libcurl build package
 
+[![ci](https://github.com/mattnite/zig-libcurl/actions/workflows/ci.yml/badge.svg)](https://github.com/mattnite/zig-libcurl/actions/workflows/ci.yml)
 
 ## Like this project?
 
