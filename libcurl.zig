@@ -44,7 +44,7 @@ pub fn create(
     const ret = b.addStaticLibrary("curl", null);
     ret.setTarget(target);
     ret.setBuildMode(mode);
-    ret.addCSourceFiles(srcs, &.{});
+    ret.addCSourceFiles(srcs, &.{"-fno-sanitize=all"});
     ret.addIncludeDir(include_dir);
     //ret.addIncludeDir(config_dir);
     ret.addIncludeDir(lib_dir);
