@@ -66,7 +66,7 @@ pub const Easy = opaque {
     }
 
     pub fn getResponseCode(self: *Easy) Error!isize {
-        var code: isize = undefined;
+        var code: isize = 0;
         try tryCurl(c.curl_easy_getinfo(self, c.CURLINFO_RESPONSE_CODE, &code));
         return code;
     }
