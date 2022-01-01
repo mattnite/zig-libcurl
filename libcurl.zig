@@ -53,6 +53,8 @@ pub fn create(
     var exported_defines = std.ArrayList(Define).init(b.allocator);
     defer exported_defines.deinit();
 
+    ret.defineCMacro("BUILDING_LIBCURL", null);
+
     // when not building a shared library
     ret.defineCMacro("CURL_STATICLIB", "1");
     try exported_defines.append(.{ .key = "CURL_STATICLIB", .value = "1" });
@@ -64,8 +66,6 @@ pub fn create(
         return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
     }
 
-    //ret.defineCMacro("HAVE_CONFIG_H", null);
-    ret.defineCMacro("BUILDING_LIBCURL", null);
     //ret.defineCMacro("libcurl_EXPORTS", null);
 
     //ret.defineCMacro("STDC_HEADERS", null);
