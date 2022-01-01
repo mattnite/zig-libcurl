@@ -1,10 +1,16 @@
 build_deps:
-  mbedtls:
-    local: ../zig-mbedtls
-    root: mbedtls.zig
-  libssh2:
-    local: ../zig-libssh2
-    root: libssh2.zig
   zlib:
-    local: ../zig-zlib
-    root: zlib.zig
+    git:
+      url: "https://github.com/mattnite/zig-zlib.git"
+      ref: main
+      root: zlib.zig
+  mbedtls:
+    git:
+      url: "https://github.com/mattnite/zig-mbedtls.git"
+      ref: main
+      root: mbedtls.zig
+  libssh2:
+    git:
+      url: "https://github.com/mattnite/zig-libssh2.git"
+      ref: main
+      root: libssh2.zig

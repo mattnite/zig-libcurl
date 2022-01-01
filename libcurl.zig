@@ -4,39 +4,35 @@ fn root() []const u8 {
     return std.fs.path.dirname(@src().file) orelse ".";
 }
 
-fn pathJoinRoot(comptime components: []const []const u8) []const u8 {
-    var ret = root();
-    inline for (components) |component|
-        ret = ret ++ std.fs.path.sep_str ++ component;
+const root_path = root() ++ "/";
 
-    return ret;
-}
-
-pub const include_dir = pathJoinRoot(&.{ "c", "include" });
-const config_dir = pathJoinRoot(&.{"config"});
-const lib_dir = pathJoinRoot(&.{ "c", "lib" });
-
-pub const Options = struct {
-    zlib_include_dir: ?[]const u8 = null,
-    libssh2_include_dir: ?[]const u8 = null,
-    mbedtls_include_dir: ?[]const u8 = null,
-};
+pub const include_dir = root_path ++ "curl/include";
+const package_path = root_path ++ "src/main.zig";
+const config_dir = root_path ++ "config";
+const lib_dir = root_path ++ "curl/lib";
 
 pub const Define = struct {
     key: []const u8,
     value: ?[]const u8,
 };
 
+pub const Options = struct {
+    import_name: ?[]const u8 = null,
+};
+
 pub const Library = struct {
     exported_defines: []Define,
     step: *std.build.LibExeObjStep,
 
-    pub fn link(self: Library, other: *std.build.LibExeObjStep) void {
+    pub fn link(self: Library, other: *std.build.LibExeObjStep, opts: Options) void {
         for (self.exported_defines) |def|
             other.defineCMacro(def.key, def.value);
 
         other.addIncludeDir(include_dir);
         other.linkLibrary(self.step);
+
+        if (opts.import_name) |import_name|
+            other.addPackagePath(import_name, package_path);
     }
 };
 
@@ -44,36 +40,42 @@ pub fn create(
     b: *std.build.Builder,
     target: std.zig.CrossTarget,
     mode: std.builtin.Mode,
-    opts: Options,
 ) !Library {
     const ret = b.addStaticLibrary("curl", null);
     ret.setTarget(target);
     ret.setBuildMode(mode);
-    ret.addCSourceFiles(srcs, &.{});
+    ret.addCSourceFiles(srcs, &.{"-fno-sanitize=all"});
     ret.addIncludeDir(include_dir);
     //ret.addIncludeDir(config_dir);
     ret.addIncludeDir(lib_dir);
     ret.linkLibC();
 
-    if (opts.zlib_include_dir) |zlib_include|
-        ret.addIncludeDir(zlib_include);
-
-    if (opts.libssh2_include_dir) |libssh2_include|
-        ret.addIncludeDir(libssh2_include);
-
-    if (opts.mbedtls_include_dir) |mbedtls_include|
-        ret.addIncludeDir(mbedtls_include);
-
     var exported_defines = std.ArrayList(Define).init(b.allocator);
     defer exported_defines.deinit();
 
-    try exported_defines.append(.{ .key = "CURL_STATICLIB", .value = "1" });
-
-    //ret.defineCMacro("HAVE_CONFIG_H", null);
     ret.defineCMacro("BUILDING_LIBCURL", null);
-    //ret.defineCMacro("libcurl_EXPORTS", null);
+
     // when not building a shared library
     ret.defineCMacro("CURL_STATICLIB", "1");
+    try exported_defines.append(.{ .key = "CURL_STATICLIB", .value = "1" });
+
+    // disables LDAP
+    ret.defineCMacro("CURL_DISABLE_LDAP", "1");
+
+    // disables LDAPS
+    ret.defineCMacro("CURL_DISABLE_LDAPS", "1");
+
+    // if mbedTLS is enabled
+    ret.defineCMacro("USE_MBEDTLS", "1");
+
+    if (target.isWindows()) {
+        // Define if you want to enable WIN32 threaded DNS lookup
+        //ret.defineCMacro("USE_THREADS_WIN32", "1");
+
+        return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
+    }
+
+    //ret.defineCMacro("libcurl_EXPORTS", null);
 
     //ret.defineCMacro("STDC_HEADERS", null);
 
@@ -121,12 +123,6 @@ pub fn create(
 
     // disables IMAP
     ret.defineCMacro("CURL_DISABLE_IMAP", "1");
-
-    // disables LDAP
-    ret.defineCMacro("CURL_DISABLE_LDAP", "1");
-
-    // disables LDAPS
-    ret.defineCMacro("CURL_DISABLE_LDAPS", "1");
 
     // disables --libcurl option from the curl tool
     // #undef CURL_DISABLE_LIBCURL_OPTION
@@ -176,8 +172,17 @@ pub fn create(
     // disables verbose strings
     // #undef CURL_DISABLE_VERBOSE_STRINGS
 
-    if (target.isWindows())
-        return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
+    // Define to 1 if you have the `ssh2' library (-lssh2).
+    ret.defineCMacro("HAVE_LIBSSH2", "1");
+
+    // Define to 1 if you have the <libssh2.h> header file.
+    ret.defineCMacro("HAVE_LIBSSH2_H", "1");
+
+    // if zlib is available
+    ret.defineCMacro("HAVE_LIBZ", "1");
+
+    // if you have the zlib.h header file
+    ret.defineCMacro("HAVE_ZLIB_H", "1");
 
     // to make a symbol visible
     ret.defineCMacro("CURL_EXTERN_SYMBOL", "__attribute__ ((__visibility__ (\"default\"))");
@@ -441,18 +446,6 @@ pub fn create(
     // Define to 1 if you have the `socket' library (-lsocket).
     // #undef HAVE_LIBSOCKET
 
-    // Define to 1 if you have the `ssh2' library (-lssh2).
-    ret.defineCMacro("HAVE_LIBSSH2", "1");
-
-    // Define to 1 if you have the <libssh2.h> header file.
-    ret.defineCMacro("HAVE_LIBSSH2_H", "1");
-
-    // Define to 1 if you have the <libssh/libssh.h> header file.
-    // #undef HAVE_LIBSSH_LIBSSH_H
-
-    // if zlib is available
-    ret.defineCMacro("HAVE_LIBZ", "1");
-
     // if brotli is available
     // #undef HAVE_BROTLI
 
@@ -502,27 +495,6 @@ pub fn create(
 
     // if you have an old MIT gssapi library, lacking GSS_C_NT_HOSTBASED_SERVICE
     // #undef HAVE_OLD_GSSMIT
-
-    // Define to 1 if you have the <openssl/crypto.h> header file.
-    // #undef HAVE_OPENSSL_CRYPTO_H
-
-    // Define to 1 if you have the <openssl/err.h> header file.
-    // #undef HAVE_OPENSSL_ERR_H
-
-    // Define to 1 if you have the <openssl/pem.h> header file.
-    // #undef HAVE_OPENSSL_PEM_H
-
-    // Define to 1 if you have the <openssl/pkcs12.h> header file.
-    // #undef HAVE_OPENSSL_PKCS12_H
-
-    // Define to 1 if you have the <openssl/rsa.h> header file.
-    // #undef HAVE_OPENSSL_RSA_H
-
-    // Define to 1 if you have the <openssl/ssl.h> header file.
-    // #undef HAVE_OPENSSL_SSL_H
-
-    // Define to 1 if you have the <openssl/x509.h> header file.
-    // #undef HAVE_OPENSSL_X509_H
 
     // Define to 1 if you have the <pem.h> header file.
     // #undef HAVE_PEM_H
@@ -616,9 +588,6 @@ pub fn create(
 
     // Define to 1 if you have the `socket' function.
     ret.defineCMacro("HAVE_SOCKET", "1");
-
-    // Define to 1 if you have the <ssl.h> header file.
-    // #undef HAVE_SSL_H
 
     // Define to 1 if you have the <stdbool.h> header file.
     ret.defineCMacro("HAVE_STDBOOL_H", "1");
@@ -785,9 +754,6 @@ pub fn create(
     // Define if you have the <process.h> header file.
     // #undef HAVE_PROCESS_H
 
-    // if you have the zlib.h header file
-    ret.defineCMacro("HAVE_ZLIB_H", "1");
-
     // Define to the sub-directory in which libtool stores uninstalled libraries.
 
     // #undef LT_OBJDIR
@@ -949,27 +915,6 @@ pub fn create(
     // Define if you want to enable POSIX threaded DNS lookup
     ret.defineCMacro("USE_THREADS_POSIX", "1");
 
-    // Define if you want to enable WIN32 threaded DNS lookup
-    // #undef USE_THREADS_WIN32
-
-    // if GnuTLS is enabled
-    // #undef USE_GNUTLS
-
-    // if Secure Transport is enabled
-    // #undef USE_SECTRANSP
-
-    // if mbedTLS is enabled
-    ret.defineCMacro("USE_MBEDTLS", "1");
-
-    // if BearSSL is enabled
-    // #undef USE_BEARSSL
-
-    // if WolfSSL is enabled
-    // #undef USE_WOLFSSL
-
-    // if libSSH is in use
-    // #undef USE_LIBSSH
-
     // if libSSH2 is in use
     ret.defineCMacro("USE_LIBSSH2", "1");
 
@@ -984,13 +929,6 @@ pub fn create(
 
     // if you want to use OpenLDAP code instead of legacy ldap implementation
     // #undef USE_OPENLDAP
-
-    // if OpenSSL is in use
-    // #undef USE_OPENSSL
-
-    // Define to 1 if you don't want the OpenSSL configuration to be loaded
-    // automatically
-    // #undef CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG
 
     // to enable NGHTTP2
     // #undef USE_NGHTTP2
@@ -1072,166 +1010,161 @@ pub fn create(
     return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
 }
 
-const srcs = blk: {
-    @setEvalBranchQuota(3000);
-    const ret = &.{
-        pathJoinRoot(&.{ "c", "lib", "hostcheck.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_gethostname.c" }),
-        pathJoinRoot(&.{ "c", "lib", "strerror.c" }),
-        pathJoinRoot(&.{ "c", "lib", "strdup.c" }),
-        pathJoinRoot(&.{ "c", "lib", "asyn-ares.c" }),
-        pathJoinRoot(&.{ "c", "lib", "pop3.c" }),
-        pathJoinRoot(&.{ "c", "lib", "bufref.c" }),
-        pathJoinRoot(&.{ "c", "lib", "rename.c" }),
-        pathJoinRoot(&.{ "c", "lib", "nwlib.c" }),
-        pathJoinRoot(&.{ "c", "lib", "file.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_gssapi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "ldap.c" }),
-        pathJoinRoot(&.{ "c", "lib", "socketpair.c" }),
-        pathJoinRoot(&.{ "c", "lib", "system_win32.c" }),
-        pathJoinRoot(&.{ "c", "lib", "http_aws_sigv4.c" }),
-        pathJoinRoot(&.{ "c", "lib", "content_encoding.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vquic", "ngtcp2.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vquic", "quiche.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vquic", "vquic.c" }),
-        pathJoinRoot(&.{ "c", "lib", "ftp.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_ntlm_wb.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_ntlm_core.c" }),
-        pathJoinRoot(&.{ "c", "lib", "hostip.c" }),
-        pathJoinRoot(&.{ "c", "lib", "urlapi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_get_line.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "mesalink.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "mbedtls_threadlock.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "nss.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "gskit.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "wolfssl.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "keylog.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "rustls.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "vtls.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "gtls.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "schannel.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "schannel_verify.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "sectransp.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "openssl.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "mbedtls.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vtls", "bearssl.c" }),
-        pathJoinRoot(&.{ "c", "lib", "parsedate.c" }),
-        pathJoinRoot(&.{ "c", "lib", "sendf.c" }),
-        pathJoinRoot(&.{ "c", "lib", "altsvc.c" }),
-        pathJoinRoot(&.{ "c", "lib", "krb5.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_rtmp.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_ctype.c" }),
-        pathJoinRoot(&.{ "c", "lib", "inet_pton.c" }),
-        pathJoinRoot(&.{ "c", "lib", "pingpong.c" }),
-        pathJoinRoot(&.{ "c", "lib", "mime.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "krb5_gssapi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "krb5_sspi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "spnego_sspi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "digest.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "ntlm_sspi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "vauth.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "gsasl.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "cram.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "oauth2.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "digest_sspi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "cleartext.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "spnego_gssapi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vauth", "ntlm.c" }),
-        pathJoinRoot(&.{ "c", "lib", "version_win32.c" }),
-        pathJoinRoot(&.{ "c", "lib", "multi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "http_ntlm.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_sspi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "md5.c" }),
-        pathJoinRoot(&.{ "c", "lib", "dict.c" }),
-        pathJoinRoot(&.{ "c", "lib", "http.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_des.c" }),
-        pathJoinRoot(&.{ "c", "lib", "memdebug.c" }),
-        pathJoinRoot(&.{ "c", "lib", "non-ascii.c" }),
-        pathJoinRoot(&.{ "c", "lib", "transfer.c" }),
-        pathJoinRoot(&.{ "c", "lib", "inet_ntop.c" }),
-        pathJoinRoot(&.{ "c", "lib", "slist.c" }),
-        pathJoinRoot(&.{ "c", "lib", "http_negotiate.c" }),
-        pathJoinRoot(&.{ "c", "lib", "http_digest.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vssh", "wolfssh.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vssh", "libssh.c" }),
-        pathJoinRoot(&.{ "c", "lib", "vssh", "libssh2.c" }),
-        pathJoinRoot(&.{ "c", "lib", "hsts.c" }),
-        pathJoinRoot(&.{ "c", "lib", "escape.c" }),
-        pathJoinRoot(&.{ "c", "lib", "hostsyn.c" }),
-        pathJoinRoot(&.{ "c", "lib", "speedcheck.c" }),
-        pathJoinRoot(&.{ "c", "lib", "asyn-thread.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_addrinfo.c" }),
-        pathJoinRoot(&.{ "c", "lib", "nwos.c" }),
-        pathJoinRoot(&.{ "c", "lib", "tftp.c" }),
-        pathJoinRoot(&.{ "c", "lib", "version.c" }),
-        pathJoinRoot(&.{ "c", "lib", "rand.c" }),
-        pathJoinRoot(&.{ "c", "lib", "psl.c" }),
-        pathJoinRoot(&.{ "c", "lib", "imap.c" }),
-        pathJoinRoot(&.{ "c", "lib", "mqtt.c" }),
-        pathJoinRoot(&.{ "c", "lib", "share.c" }),
-        pathJoinRoot(&.{ "c", "lib", "doh.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_range.c" }),
-        pathJoinRoot(&.{ "c", "lib", "openldap.c" }),
-        pathJoinRoot(&.{ "c", "lib", "getinfo.c" }),
-        pathJoinRoot(&.{ "c", "lib", "select.c" }),
-        pathJoinRoot(&.{ "c", "lib", "base64.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_sasl.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_endian.c" }),
-        pathJoinRoot(&.{ "c", "lib", "connect.c" }),
-        pathJoinRoot(&.{ "c", "lib", "fileinfo.c" }),
-        pathJoinRoot(&.{ "c", "lib", "telnet.c" }),
-        pathJoinRoot(&.{ "c", "lib", "x509asn1.c" }),
-        pathJoinRoot(&.{ "c", "lib", "conncache.c" }),
-        pathJoinRoot(&.{ "c", "lib", "strcase.c" }),
-        pathJoinRoot(&.{ "c", "lib", "if2ip.c" }),
-        pathJoinRoot(&.{ "c", "lib", "gopher.c" }),
-        pathJoinRoot(&.{ "c", "lib", "ftplistparser.c" }),
-        pathJoinRoot(&.{ "c", "lib", "setopt.c" }),
-        pathJoinRoot(&.{ "c", "lib", "idn_win32.c" }),
-        pathJoinRoot(&.{ "c", "lib", "strtoofft.c" }),
-        pathJoinRoot(&.{ "c", "lib", "hmac.c" }),
-        pathJoinRoot(&.{ "c", "lib", "getenv.c" }),
-        pathJoinRoot(&.{ "c", "lib", "smb.c" }),
-        pathJoinRoot(&.{ "c", "lib", "dotdot.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_threads.c" }),
-        pathJoinRoot(&.{ "c", "lib", "md4.c" }),
-        pathJoinRoot(&.{ "c", "lib", "easygetopt.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_fnmatch.c" }),
-        pathJoinRoot(&.{ "c", "lib", "sha256.c" }),
-        pathJoinRoot(&.{ "c", "lib", "cookie.c" }),
-        pathJoinRoot(&.{ "c", "lib", "amigaos.c" }),
-        pathJoinRoot(&.{ "c", "lib", "progress.c" }),
-        pathJoinRoot(&.{ "c", "lib", "nonblock.c" }),
-        pathJoinRoot(&.{ "c", "lib", "llist.c" }),
-        pathJoinRoot(&.{ "c", "lib", "hostip6.c" }),
-        pathJoinRoot(&.{ "c", "lib", "dynbuf.c" }),
-        pathJoinRoot(&.{ "c", "lib", "warnless.c" }),
-        pathJoinRoot(&.{ "c", "lib", "hostasyn.c" }),
-        pathJoinRoot(&.{ "c", "lib", "http_chunks.c" }),
-        pathJoinRoot(&.{ "c", "lib", "wildcard.c" }),
-        pathJoinRoot(&.{ "c", "lib", "strtok.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_memrchr.c" }),
-        pathJoinRoot(&.{ "c", "lib", "rtsp.c" }),
-        pathJoinRoot(&.{ "c", "lib", "http2.c" }),
-        pathJoinRoot(&.{ "c", "lib", "socks.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_path.c" }),
-        pathJoinRoot(&.{ "c", "lib", "curl_multibyte.c" }),
-        pathJoinRoot(&.{ "c", "lib", "http_proxy.c" }),
-        pathJoinRoot(&.{ "c", "lib", "formdata.c" }),
-        pathJoinRoot(&.{ "c", "lib", "netrc.c" }),
-        pathJoinRoot(&.{ "c", "lib", "socks_sspi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "mprintf.c" }),
-        pathJoinRoot(&.{ "c", "lib", "easyoptions.c" }),
-        pathJoinRoot(&.{ "c", "lib", "easy.c" }),
-        pathJoinRoot(&.{ "c", "lib", "c-hyper.c" }),
-        pathJoinRoot(&.{ "c", "lib", "hostip4.c" }),
-        pathJoinRoot(&.{ "c", "lib", "timeval.c" }),
-        pathJoinRoot(&.{ "c", "lib", "smtp.c" }),
-        pathJoinRoot(&.{ "c", "lib", "splay.c" }),
-        pathJoinRoot(&.{ "c", "lib", "socks_gssapi.c" }),
-        pathJoinRoot(&.{ "c", "lib", "url.c" }),
-        pathJoinRoot(&.{ "c", "lib", "hash.c" }),
-    };
-
-    break :blk ret;
+const srcs = &.{
+    root_path ++ "curl/lib/hostcheck.c",
+    root_path ++ "curl/lib/curl_gethostname.c",
+    root_path ++ "curl/lib/strerror.c",
+    root_path ++ "curl/lib/strdup.c",
+    root_path ++ "curl/lib/asyn-ares.c",
+    root_path ++ "curl/lib/pop3.c",
+    root_path ++ "curl/lib/bufref.c",
+    root_path ++ "curl/lib/rename.c",
+    root_path ++ "curl/lib/nwlib.c",
+    root_path ++ "curl/lib/file.c",
+    root_path ++ "curl/lib/curl_gssapi.c",
+    root_path ++ "curl/lib/ldap.c",
+    root_path ++ "curl/lib/socketpair.c",
+    root_path ++ "curl/lib/system_win32.c",
+    root_path ++ "curl/lib/http_aws_sigv4.c",
+    root_path ++ "curl/lib/content_encoding.c",
+    root_path ++ "curl/lib/vquic/ngtcp2.c",
+    root_path ++ "curl/lib/vquic/quiche.c",
+    root_path ++ "curl/lib/vquic/vquic.c",
+    root_path ++ "curl/lib/ftp.c",
+    root_path ++ "curl/lib/curl_ntlm_wb.c",
+    root_path ++ "curl/lib/curl_ntlm_core.c",
+    root_path ++ "curl/lib/hostip.c",
+    root_path ++ "curl/lib/urlapi.c",
+    root_path ++ "curl/lib/curl_get_line.c",
+    root_path ++ "curl/lib/vtls/mesalink.c",
+    root_path ++ "curl/lib/vtls/mbedtls_threadlock.c",
+    root_path ++ "curl/lib/vtls/nss.c",
+    root_path ++ "curl/lib/vtls/gskit.c",
+    root_path ++ "curl/lib/vtls/wolfssl.c",
+    root_path ++ "curl/lib/vtls/keylog.c",
+    root_path ++ "curl/lib/vtls/rustls.c",
+    root_path ++ "curl/lib/vtls/vtls.c",
+    root_path ++ "curl/lib/vtls/gtls.c",
+    root_path ++ "curl/lib/vtls/schannel.c",
+    root_path ++ "curl/lib/vtls/schannel_verify.c",
+    root_path ++ "curl/lib/vtls/sectransp.c",
+    root_path ++ "curl/lib/vtls/openssl.c",
+    root_path ++ "curl/lib/vtls/mbedtls.c",
+    root_path ++ "curl/lib/vtls/bearssl.c",
+    root_path ++ "curl/lib/parsedate.c",
+    root_path ++ "curl/lib/sendf.c",
+    root_path ++ "curl/lib/altsvc.c",
+    root_path ++ "curl/lib/krb5.c",
+    root_path ++ "curl/lib/curl_rtmp.c",
+    root_path ++ "curl/lib/curl_ctype.c",
+    root_path ++ "curl/lib/inet_pton.c",
+    root_path ++ "curl/lib/pingpong.c",
+    root_path ++ "curl/lib/mime.c",
+    root_path ++ "curl/lib/vauth/krb5_gssapi.c",
+    root_path ++ "curl/lib/vauth/krb5_sspi.c",
+    root_path ++ "curl/lib/vauth/spnego_sspi.c",
+    root_path ++ "curl/lib/vauth/digest.c",
+    root_path ++ "curl/lib/vauth/ntlm_sspi.c",
+    root_path ++ "curl/lib/vauth/vauth.c",
+    root_path ++ "curl/lib/vauth/gsasl.c",
+    root_path ++ "curl/lib/vauth/cram.c",
+    root_path ++ "curl/lib/vauth/oauth2.c",
+    root_path ++ "curl/lib/vauth/digest_sspi.c",
+    root_path ++ "curl/lib/vauth/cleartext.c",
+    root_path ++ "curl/lib/vauth/spnego_gssapi.c",
+    root_path ++ "curl/lib/vauth/ntlm.c",
+    root_path ++ "curl/lib/version_win32.c",
+    root_path ++ "curl/lib/multi.c",
+    root_path ++ "curl/lib/http_ntlm.c",
+    root_path ++ "curl/lib/curl_sspi.c",
+    root_path ++ "curl/lib/md5.c",
+    root_path ++ "curl/lib/dict.c",
+    root_path ++ "curl/lib/http.c",
+    root_path ++ "curl/lib/curl_des.c",
+    root_path ++ "curl/lib/memdebug.c",
+    root_path ++ "curl/lib/non-ascii.c",
+    root_path ++ "curl/lib/transfer.c",
+    root_path ++ "curl/lib/inet_ntop.c",
+    root_path ++ "curl/lib/slist.c",
+    root_path ++ "curl/lib/http_negotiate.c",
+    root_path ++ "curl/lib/http_digest.c",
+    root_path ++ "curl/lib/vssh/wolfssh.c",
+    root_path ++ "curl/lib/vssh/libssh.c",
+    root_path ++ "curl/lib/vssh/libssh2.c",
+    root_path ++ "curl/lib/hsts.c",
+    root_path ++ "curl/lib/escape.c",
+    root_path ++ "curl/lib/hostsyn.c",
+    root_path ++ "curl/lib/speedcheck.c",
+    root_path ++ "curl/lib/asyn-thread.c",
+    root_path ++ "curl/lib/curl_addrinfo.c",
+    root_path ++ "curl/lib/nwos.c",
+    root_path ++ "curl/lib/tftp.c",
+    root_path ++ "curl/lib/version.c",
+    root_path ++ "curl/lib/rand.c",
+    root_path ++ "curl/lib/psl.c",
+    root_path ++ "curl/lib/imap.c",
+    root_path ++ "curl/lib/mqtt.c",
+    root_path ++ "curl/lib/share.c",
+    root_path ++ "curl/lib/doh.c",
+    root_path ++ "curl/lib/curl_range.c",
+    root_path ++ "curl/lib/openldap.c",
+    root_path ++ "curl/lib/getinfo.c",
+    root_path ++ "curl/lib/select.c",
+    root_path ++ "curl/lib/base64.c",
+    root_path ++ "curl/lib/curl_sasl.c",
+    root_path ++ "curl/lib/curl_endian.c",
+    root_path ++ "curl/lib/connect.c",
+    root_path ++ "curl/lib/fileinfo.c",
+    root_path ++ "curl/lib/telnet.c",
+    root_path ++ "curl/lib/x509asn1.c",
+    root_path ++ "curl/lib/conncache.c",
+    root_path ++ "curl/lib/strcase.c",
+    root_path ++ "curl/lib/if2ip.c",
+    root_path ++ "curl/lib/gopher.c",
+    root_path ++ "curl/lib/ftplistparser.c",
+    root_path ++ "curl/lib/setopt.c",
+    root_path ++ "curl/lib/idn_win32.c",
+    root_path ++ "curl/lib/strtoofft.c",
+    root_path ++ "curl/lib/hmac.c",
+    root_path ++ "curl/lib/getenv.c",
+    root_path ++ "curl/lib/smb.c",
+    root_path ++ "curl/lib/dotdot.c",
+    root_path ++ "curl/lib/curl_threads.c",
+    root_path ++ "curl/lib/md4.c",
+    root_path ++ "curl/lib/easygetopt.c",
+    root_path ++ "curl/lib/curl_fnmatch.c",
+    root_path ++ "curl/lib/sha256.c",
+    root_path ++ "curl/lib/cookie.c",
+    root_path ++ "curl/lib/amigaos.c",
+    root_path ++ "curl/lib/progress.c",
+    root_path ++ "curl/lib/nonblock.c",
+    root_path ++ "curl/lib/llist.c",
+    root_path ++ "curl/lib/hostip6.c",
+    root_path ++ "curl/lib/dynbuf.c",
+    root_path ++ "curl/lib/warnless.c",
+    root_path ++ "curl/lib/hostasyn.c",
+    root_path ++ "curl/lib/http_chunks.c",
+    root_path ++ "curl/lib/wildcard.c",
+    root_path ++ "curl/lib/strtok.c",
+    root_path ++ "curl/lib/curl_memrchr.c",
+    root_path ++ "curl/lib/rtsp.c",
+    root_path ++ "curl/lib/http2.c",
+    root_path ++ "curl/lib/socks.c",
+    root_path ++ "curl/lib/curl_path.c",
+    root_path ++ "curl/lib/curl_multibyte.c",
+    root_path ++ "curl/lib/http_proxy.c",
+    root_path ++ "curl/lib/formdata.c",
+    root_path ++ "curl/lib/netrc.c",
+    root_path ++ "curl/lib/socks_sspi.c",
+    root_path ++ "curl/lib/mprintf.c",
+    root_path ++ "curl/lib/easyoptions.c",
+    root_path ++ "curl/lib/easy.c",
+    root_path ++ "curl/lib/c-hyper.c",
+    root_path ++ "curl/lib/hostip4.c",
+    root_path ++ "curl/lib/timeval.c",
+    root_path ++ "curl/lib/smtp.c",
+    root_path ++ "curl/lib/splay.c",
+    root_path ++ "curl/lib/socks_gssapi.c",
+    root_path ++ "curl/lib/url.c",
+    root_path ++ "curl/lib/hash.c",
 };

@@ -33,6 +33,10 @@ pub const Easy = opaque {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_FOLLOWLOCATION, @as(c_ulong, if (val) 1 else 0)));
     }
 
+    pub fn setVerbose(self: *Easy, val: bool) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_VERBOSE, @as(c_ulong, if (val) 1 else 0)));
+    }
+
     pub fn setSslVerifyPeer(self: *Easy, val: bool) Error!void {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_SSL_VERIFYPEER, @as(c_ulong, if (val) 1 else 0)));
     }
@@ -53,12 +57,16 @@ pub const Easy = opaque {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_XFERINFODATA, data));
     }
 
+    pub fn setErrorBuffer(self: *Easy, data: *[c.CURL_ERROR_SIZE]u8) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_XFERINFODATA, data));
+    }
+
     pub fn perform(self: *Easy) Error!void {
         return tryCurl(c.curl_easy_perform(self));
     }
 
     pub fn getResponseCode(self: *Easy) Error!isize {
-        var code: isize = undefined;
+        var code: isize = 0;
         try tryCurl(c.curl_easy_getinfo(self, c.CURLINFO_RESPONSE_CODE, &code));
         return code;
     }
@@ -82,6 +90,7 @@ test "https put" {
     try easy.setUrl("https://example.com");
     try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(emptyWrite);
+    try easy.setVerbose(true);
     try easy.perform();
     const code = try easy.getResponseCode();
 

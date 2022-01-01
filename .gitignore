@@ -3,3 +3,4 @@ zig-out
 deps.zig
 gyro.lock
 .gyro
+build_runner.zig

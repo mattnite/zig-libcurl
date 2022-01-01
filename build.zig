@@ -10,27 +10,22 @@ pub fn build(b: *std.build.Builder) !void {
 
     const z = zlib.create(b, target, mode);
     const tls = mbedtls.create(b, target, mode);
-    const ssh2 = libssh2.create(b, target, mode, .{
-        .mbedtls_include_dir = mbedtls.include_dir,
-    });
-    const curl = try libcurl.create(b, target, mode, .{
-        .zlib_include_dir = zlib.include_dir,
-        .libssh2_include_dir = libssh2.include_dir,
-        .mbedtls_include_dir = mbedtls.include_dir,
-    });
-    // TODO: combine these static libs into one maybe?
-    //curl.linkLibrary(z);
-    //curl.linkLibrary(ssh2);
-    //curl.linkLibrary(tls);
+    const ssh2 = libssh2.create(b, target, mode);
+    tls.link(ssh2.step);
+
+    const curl = try libcurl.create(b, target, mode);
+    ssh2.link(curl.step);
+    tls.link(curl.step);
+    z.link(curl.step, .{});
     curl.step.install();
 
     const tests = b.addTest("src/main.zig");
     tests.setBuildMode(mode);
     tests.setTarget(target);
-    curl.link(tests);
-    tests.linkLibrary(tls);
-    tests.linkLibrary(ssh2);
-    tests.linkLibrary(z);
+    curl.link(tests, .{});
+    z.link(tests, .{});
+    tls.link(tests);
+    ssh2.link(tests);
 
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&tests.step);
