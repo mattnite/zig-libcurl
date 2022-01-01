@@ -33,7 +33,7 @@ pub fn build(b: *std.build.Builder) void {
 }
 ```
 
-Now code that is part of the `my-program` executable can import the libcurl bindings with `@import("libcurl")`.
+Now code that is part of the `my-program` executable can import the libcurl bindings with `@import("curl")`.
 
 ### Only link to your application
 
