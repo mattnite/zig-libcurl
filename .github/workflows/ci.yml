@@ -97,4 +97,74 @@ jobs:
       if: ${{ matrix.mode != 'debug' }}
       run: gyro build test -D${{ matrix.mode }}
 
+  crosscompile-from-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        target: [
+          riscv64-linux-gnu,
+          riscv64-linux-musl,
+          aarch64-linux-gnu,
+          aarch64-linux-musl,
+          aarch64-macos,
+          i386-linux-gnu,
+          i386-linux-musl,
+          x86_64-linux-gnu,
+          x86_64-linux-musl,
+          x86_64-macos,
+        ]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+        fetch-depth: 0
 
+    - name: Setup Zig
+      uses: goto-bus-stop/setup-zig@v1.3.0
+      with:
+        version: master
+
+    - name: Setup Gyro
+      uses: mattnite/setup-gyro@v1
+      with:
+        access-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build
+      run: gyro build
+
+  crosscompile-from-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [
+          riscv64-linux-gnu,
+          riscv64-linux-musl,
+          aarch64-linux-gnu,
+          aarch64-linux-musl,
+          i386-linux-gnu,
+          i386-linux-musl,
+          i386-windows,
+          x86_64-linux-gnu,
+          x86_64-linux-musl,
+          x86_64-windows-gnu,
+        ]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Setup Zig
+      uses: goto-bus-stop/setup-zig@v1.3.0
+      with:
+        version: master
+
+    - name: Setup Gyro
+      uses: mattnite/setup-gyro@v1
+      with:
+        access-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build
+      run: gyro build
