@@ -116,6 +116,30 @@ pub const Url = opaque {
         return host.?;
     }
 
+    pub fn getPath(self: *Url) UrlError![*:0]u8 {
+        var path: ?[*:0]u8 = undefined;
+        try tryCurlUrl(c.curl_url_get(@ptrCast(*c.CURLU, self), c.CURLUPART_PATH, &path, 0));
+        return path.?;
+    }
+
+    pub fn getScheme(self: *Url) UrlError![*:0]u8 {
+        var scheme: ?[*:0]u8 = undefined;
+        try tryCurlUrl(c.curl_url_get(@ptrCast(*c.CURLU, self), c.CURLUPART_SCHEME, &scheme, 0));
+        return scheme.?;
+    }
+
+    pub fn getPort(self: *Url) UrlError![*:0]u8 {
+        var port: ?[*:0]u8 = undefined;
+        try tryCurlUrl(c.curl_url_get(@ptrCast(*c.CURLU, self), c.CURLUPART_PORT, &port, 0));
+        return port.?;
+    }
+
+    pub fn getQuery(self: *Url) UrlError![*:0]u8 {
+        var query: ?[*:0]u8 = undefined;
+        try tryCurlUrl(c.curl_url_get(@ptrCast(*c.CURLU, self), c.CURLUPART_QUERY, &query, 0));
+        return query.?;
+    }
+
     fn tryCurlUrl(code: c.CURLUcode) UrlError!void {
         if (code != c.CURLUE_OK)
             return errorFromCurlUrl(code);
@@ -126,10 +150,22 @@ test "parse url" {
     const url = try Url.init();
     defer url.cleanup();
 
-    try url.set("https://arst.com/blarg/foo.git");
+    try url.set("https://arst.com:80/blarg/foo.git?what=yes&please=no");
+
+    const scheme = try url.getScheme();
+    try std.testing.expectEqualStrings("https", std.mem.span(scheme));
 
     const host = try url.getHost();
     try std.testing.expectEqualStrings("arst.com", std.mem.span(host));
+
+    const port = try url.getPort();
+    try std.testing.expectEqualStrings("80", std.mem.span(port));
+
+    const path = try url.getPath();
+    try std.testing.expectEqualStrings("/blarg/foo.git", std.mem.span(path));
+
+    const query = try url.getQuery();
+    try std.testing.expectEqualStrings("what=yes&please=no", std.mem.span(query));
 }
 
 pub const UrlError = error{
