@@ -97,6 +97,57 @@ test "https put" {
     try std.testing.expectEqual(@as(isize, 200), code);
 }
 
+pub const Url = opaque {
+    pub fn init() UrlError!*Url {
+        return @ptrCast(?*Url, c.curl_url()) orelse error.FailedInit;
+    }
+
+    pub fn set(self: *Url, url: [:0]const u8) UrlError!void {
+        return tryCurlUrl(c.curl_url_set(@ptrCast(*c.CURLU, self), c.CURLUPART_URL, url.ptr, 0));
+    }
+
+    pub fn getHost(self: *Url) UrlError![*:0]u8 {
+        var host: ?[*:0]u8 = undefined;
+        try tryCurlUrl(c.curl_url_get(@ptrCast(*c.CURLU, self), c.CURLUPART_HOST, &host, 0));
+        return host.?;
+    }
+
+    fn tryCurlUrl(code: c.CURLUcode) UrlError!void {
+        if (code != c.CURLUE_OK)
+            return errorFromCurlUrl(code);
+    }
+};
+
+test "parse url" {
+    const url = try Url.init();
+    try url.set("https://arst.com/blarg/foo.git");
+
+    const host = try url.getHost();
+    try std.testing.expectEqualStrings("arst.com", std.mem.span(host));
+}
+
+pub const UrlError = error{
+    FailedInit,
+    BadHandle,
+    BadPartpointer,
+    MalformedInput,
+    BadPortNumber,
+    UnsupportedScheme,
+    UrlDecode,
+    OutOfMemory,
+    UserNotAllowed,
+    UnknownPart,
+    NoScheme,
+    NoUser,
+    NoPassword,
+    NoOptions,
+    NoHost,
+    NoPort,
+    NoQuery,
+    NoFragment,
+    UnknownErrorCode,
+};
+
 pub const Error = error{
     UnsupportedProtocol,
     FailedInit,
@@ -305,6 +356,32 @@ fn errorFromCurl(code: c.CURLcode) Error {
         c.CURLE_PROXY => error.Proxy,
         c.CURLE_SSL_CLIENTCERT => error.SslClientCert,
 
+        else => blk: {
+            std.debug.assert(false);
+            break :blk error.UnknownErrorCode;
+        },
+    };
+}
+
+fn errorFromCurlUrl(code: c.CURLUcode) UrlError {
+    return switch (code) {
+        c.CURLUE_BAD_HANDLE => error.BadHandle,
+        c.CURLUE_BAD_PARTPOINTER => error.BadPartpointer,
+        c.CURLUE_MALFORMED_INPUT => error.MalformedInput,
+        c.CURLUE_BAD_PORT_NUMBER => error.BadPortNumber,
+        c.CURLUE_UNSUPPORTED_SCHEME => error.UnsupportedScheme,
+        c.CURLUE_URLDECODE => error.UrlDecode,
+        c.CURLUE_OUT_OF_MEMORY => error.OutOfMemory,
+        c.CURLUE_USER_NOT_ALLOWED => error.UserNotAllowed,
+        c.CURLUE_UNKNOWN_PART => error.UnknownPart,
+        c.CURLUE_NO_SCHEME => error.NoScheme,
+        c.CURLUE_NO_USER => error.NoUser,
+        c.CURLUE_NO_PASSWORD => error.NoPassword,
+        c.CURLUE_NO_OPTIONS => error.NoOptions,
+        c.CURLUE_NO_HOST => error.NoHost,
+        c.CURLUE_NO_PORT => error.NoPort,
+        c.CURLUE_NO_QUERY => error.NoQuery,
+        c.CURLUE_NO_FRAGMENT => error.NoFragment,
         else => blk: {
             std.debug.assert(false);
             break :blk error.UnknownErrorCode;
