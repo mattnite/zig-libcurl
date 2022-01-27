@@ -102,6 +102,10 @@ pub const Url = opaque {
         return @ptrCast(?*Url, c.curl_url()) orelse error.FailedInit;
     }
 
+    pub fn cleanup(self: *Url) void {
+        c.curl_url_cleanup(@ptrCast(*c.CURLU, self));
+    }
+
     pub fn set(self: *Url, url: [:0]const u8) UrlError!void {
         return tryCurlUrl(c.curl_url_set(@ptrCast(*c.CURLU, self), c.CURLUPART_URL, url.ptr, 0));
     }
@@ -120,6 +124,8 @@ pub const Url = opaque {
 
 test "parse url" {
     const url = try Url.init();
+    defer url.cleanup();
+
     try url.set("https://arst.com/blarg/foo.git");
 
     const host = try url.getHost();
