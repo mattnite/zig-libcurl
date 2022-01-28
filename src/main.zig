@@ -45,7 +45,7 @@ pub const Easy = opaque {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_WRITEFUNCTION, write));
     }
 
-    pub fn setWriteData(self: *Easy, data: anyopaque) Error!void {
+    pub fn setWriteData(self: *Easy, data: *anyopaque) Error!void {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_WRITEDATA, data));
     }
 
@@ -53,7 +53,7 @@ pub const Easy = opaque {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_XFERINFOFUNCTION, xfer));
     }
 
-    pub fn setXferInfoData(self: *Easy, data: anyopaque) Error!void {
+    pub fn setXferInfoData(self: *Easy, data: *anyopaque) Error!void {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_XFERINFODATA, data));
     }
 
