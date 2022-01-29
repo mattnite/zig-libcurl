@@ -15,6 +15,53 @@ pub fn globalCleanup() void {
 
 pub const XferInfoFn = c.curl_xferinfo_callback;
 pub const WriteFn = c.curl_write_callback;
+pub const ReadFn = c.curl_read_callback;
+
+/// if you set this as a write function, you must set write data to a fifo of the same type
+pub fn writeToFifo(comptime FifoType: type) WriteFn {
+    return struct {
+        fn writeFn(ptr: ?[*]u8, size: usize, nmemb: usize, data: ?*anyopaque) callconv(.C) usize {
+            _ = size;
+            var slice = (ptr orelse return 0)[0..nmemb];
+            const fifo = @ptrCast(
+                *FifoType,
+                @alignCast(
+                    @alignOf(*FifoType),
+                    data orelse return 0,
+                ),
+            );
+
+            fifo.writer().writeAll(slice) catch return 0;
+            return nmemb;
+        }
+    }.writeFn;
+}
+
+/// if you set this as a read function, you must set read data to an FBS of the same type
+pub fn readFromFbs(comptime FbsType: type) ReadFn {
+    const BufferType = switch (FbsType) {
+        std.io.FixedBufferStream([]u8) => []u8,
+        std.io.FixedBufferStream([]const u8) => []const u8,
+        else => @compileError("std.io.FixedBufferStream can only have []u8 or []const u8 buffer type"),
+    };
+    return struct {
+        fn readFn(buffer: ?[*]u8, size: usize, nitems: usize, data: ?*anyopaque) callconv(.C) usize {
+            const to = (buffer orelse return c.CURL_READFUNC_ABORT)[0 .. size * nitems];
+            var fbs = @ptrCast(
+                *std.io.FixedBufferStream(BufferType),
+                @alignCast(
+                    @alignOf(*std.io.FixedBufferStream(BufferType)),
+                    data orelse return c.CURL_READFUNC_ABORT,
+                ),
+            );
+
+            return fbs.read(to) catch |err| blk: {
+                std.log.err("get fbs read error: {s}", .{@errorName(err)});
+                break :blk c.CURL_READFUNC_ABORT;
+            };
+        }
+    }.readFn;
+}
 
 pub const Easy = opaque {
     pub fn init() Error!*Easy {
@@ -41,6 +88,14 @@ pub const Easy = opaque {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_SSL_VERIFYPEER, @as(c_ulong, if (val) 1 else 0)));
     }
 
+    pub fn setReadFn(self: *Easy, read: ReadFn) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_READFUNCTION, read));
+    }
+
+    pub fn setReadData(self: *Easy, data: *anyopaque) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_READDATA, data));
+    }
+
     pub fn setWriteFn(self: *Easy, write: WriteFn) Error!void {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_WRITEFUNCTION, write));
     }
@@ -59,6 +114,14 @@ pub const Easy = opaque {
 
     pub fn setErrorBuffer(self: *Easy, data: *[c.CURL_ERROR_SIZE]u8) Error!void {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_XFERINFODATA, data));
+    }
+
+    pub fn setHeaders(self: *Easy, headers: HeaderList) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_HTTPHEADER, headers.inner));
+    }
+
+    pub fn setPost(self: *Easy) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_POST, @as(c_ulong, 1)));
     }
 
     pub fn perform(self: *Easy) Error!void {
@@ -80,16 +143,46 @@ fn emptyWrite(ptr: ?[*]u8, size: usize, nmemb: usize, data: ?*anyopaque) callcon
     return nmemb;
 }
 
-test "https put" {
+test "https get" {
+    const Fifo = std.fifo.LinearFifo(u8, .{ .Dynamic = {} });
+
     try globalInit();
     defer globalCleanup();
+
+    var fifo = Fifo.init(std.testing.allocator);
+    defer fifo.deinit();
 
     var easy = try Easy.init();
     defer easy.cleanup();
 
     try easy.setUrl("https://example.com");
     try easy.setSslVerifyPeer(false);
+    try easy.setWriteFn(writeToFifo(Fifo));
+    try easy.setWriteData(&fifo);
+    try easy.setVerbose(true);
+    try easy.perform();
+    const code = try easy.getResponseCode();
+
+    try std.testing.expectEqual(@as(isize, 200), code);
+}
+
+test "https post" {
+    try globalInit();
+    defer globalCleanup();
+
+    var easy = try Easy.init();
+    defer easy.cleanup();
+
+    const payload = "this is a payload";
+    var fbs = std.io.fixedBufferStream(payload);
+    fbs.pos = payload.len;
+
+    try easy.setUrl("https://example.com");
+    try easy.setPost();
+    try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(emptyWrite);
+    try easy.setReadFn(readFromFbs(@TypeOf(fbs)));
+    try easy.setReadData(&fbs);
     try easy.setVerbose(true);
     try easy.perform();
     const code = try easy.getResponseCode();
@@ -166,6 +259,56 @@ test "parse url" {
 
     const query = try url.getQuery();
     try std.testing.expectEqualStrings("what=yes&please=no", std.mem.span(query));
+}
+
+pub const HeaderList = struct {
+    inner: ?*c.curl_slist,
+
+    pub fn init() HeaderList {
+        return HeaderList{
+            .inner = null,
+        };
+    }
+
+    pub fn freeAll(self: *HeaderList) void {
+        c.curl_slist_free_all(self.inner);
+    }
+
+    pub fn append(self: *HeaderList, entry: [:0]const u8) !void {
+        if (c.curl_slist_append(self.inner, entry.ptr)) |list| {
+            self.inner = list;
+        } else return error.CurlHeadersAppend;
+    }
+};
+
+test "headers" {
+    try globalInit();
+    defer globalCleanup();
+
+    var headers = HeaderList.init();
+    defer headers.freeAll();
+
+    // removes a header curl would put in for us
+    try headers.append("Accept:");
+
+    // a custom header
+    try headers.append("MyCustomHeader: bruh");
+
+    // a header with no value, note the semicolon
+    try headers.append("ThisHasNoValue;");
+
+    var easy = try Easy.init();
+    defer easy.cleanup();
+
+    try easy.setUrl("https://example.com");
+    try easy.setSslVerifyPeer(false);
+    try easy.setWriteFn(emptyWrite);
+    try easy.setVerbose(true);
+    try easy.setHeaders(headers);
+    try easy.perform();
+    const code = try easy.getResponseCode();
+
+    try std.testing.expectEqual(@as(isize, 200), code);
 }
 
 pub const UrlError = error{
