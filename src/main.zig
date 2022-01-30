@@ -88,6 +88,10 @@ pub const Easy = opaque {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_SSL_VERIFYPEER, @as(c_ulong, if (val) 1 else 0)));
     }
 
+    pub fn setAcceptEncodingGzip(self: *Easy) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_ACCEPT_ENCODING, "gzip"));
+    }
+
     pub fn setReadFn(self: *Easy, read: ReadFn) Error!void {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_READFUNCTION, read));
     }
@@ -102,6 +106,10 @@ pub const Easy = opaque {
 
     pub fn setWriteData(self: *Easy, data: *anyopaque) Error!void {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_WRITEDATA, data));
+    }
+
+    pub fn setNoProgress(self: *Easy, val: bool) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_NOPROGRESS, @as(c_ulong, if (val) 1 else 0)));
     }
 
     pub fn setXferInfoFn(self: *Easy, xfer: XferInfoFn) Error!void {
@@ -157,6 +165,30 @@ test "https get" {
 
     try easy.setUrl("https://example.com");
     try easy.setSslVerifyPeer(false);
+    try easy.setWriteFn(writeToFifo(Fifo));
+    try easy.setWriteData(&fifo);
+    try easy.setVerbose(true);
+    try easy.perform();
+    const code = try easy.getResponseCode();
+
+    try std.testing.expectEqual(@as(isize, 200), code);
+}
+
+test "https get gzip encoded" {
+    const Fifo = std.fifo.LinearFifo(u8, .{ .Dynamic = {} });
+
+    try globalInit();
+    defer globalCleanup();
+
+    var fifo = Fifo.init(std.testing.allocator);
+    defer fifo.deinit();
+
+    var easy = try Easy.init();
+    defer easy.cleanup();
+
+    try easy.setUrl("http://httpbin.org/gzip");
+    try easy.setSslVerifyPeer(false);
+    try easy.setAcceptEncodingGzip();
     try easy.setWriteFn(writeToFifo(Fifo));
     try easy.setWriteData(&fifo);
     try easy.setVerbose(true);
