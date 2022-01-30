@@ -133,6 +133,14 @@ pub const Easy = opaque {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_POST, @as(c_ulong, 1)));
     }
 
+    pub fn setPostFields(self: *Easy, data: *anyopaque) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_POSTFIELDS, @ptrToInt(data)));
+    }
+
+    pub fn setPostFieldSize(self: *Easy, size: usize) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_POSTFIELDSIZE, @as(c_ulong, size)));
+    }
+
     pub fn perform(self: *Easy) Error!void {
         return tryCurl(c.curl_easy_perform(self));
     }
