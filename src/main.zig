@@ -16,6 +16,7 @@ pub fn globalCleanup() void {
 pub const XferInfoFn = c.curl_xferinfo_callback;
 pub const WriteFn = c.curl_write_callback;
 pub const ReadFn = c.curl_read_callback;
+pub const Offset = c.curl_off_t;
 
 /// if you set this as a write function, you must set write data to a fifo of the same type
 pub fn writeToFifo(comptime FifoType: type) WriteFn {
