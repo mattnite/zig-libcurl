@@ -172,7 +172,7 @@ test "https get" {
     var easy = try Easy.init();
     defer easy.cleanup();
 
-    try easy.setUrl("https://example.com");
+    try easy.setUrl("https://httpbin.org/get");
     try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(writeToFifo(Fifo));
     try easy.setWriteData(&fifo);
@@ -341,7 +341,7 @@ test "headers" {
     var easy = try Easy.init();
     defer easy.cleanup();
 
-    try easy.setUrl("https://example.com");
+    try easy.setUrl("https://httpbin.org/get");
     try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(emptyWrite);
     try easy.setVerbose(true);
