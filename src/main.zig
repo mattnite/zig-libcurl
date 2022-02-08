@@ -218,7 +218,7 @@ test "https post" {
     var fbs = std.io.fixedBufferStream(payload);
     fbs.pos = payload.len;
 
-    try easy.setUrl("https://example.com");
+    try easy.setUrl("https://httpbin.org/post");
     try easy.setPost();
     try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(emptyWrite);
