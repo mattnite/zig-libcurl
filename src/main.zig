@@ -173,7 +173,6 @@ test "https get" {
     defer easy.cleanup();
 
     try easy.setUrl("https://httpbin.org/get");
-    try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(writeToFifo(Fifo));
     try easy.setWriteData(&fifo);
     try easy.setVerbose(true);
@@ -196,7 +195,6 @@ test "https get gzip encoded" {
     defer easy.cleanup();
 
     try easy.setUrl("http://httpbin.org/gzip");
-    try easy.setSslVerifyPeer(false);
     try easy.setAcceptEncodingGzip();
     try easy.setWriteFn(writeToFifo(Fifo));
     try easy.setWriteData(&fifo);
@@ -220,7 +218,6 @@ test "https post" {
 
     try easy.setUrl("https://httpbin.org/post");
     try easy.setPost();
-    try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(emptyWrite);
     try easy.setReadFn(readFromFbs(@TypeOf(fbs)));
     try easy.setReadData(&fbs);
@@ -342,7 +339,6 @@ test "headers" {
     defer easy.cleanup();
 
     try easy.setUrl("https://httpbin.org/get");
-    try easy.setSslVerifyPeer(false);
     try easy.setWriteFn(emptyWrite);
     try easy.setVerbose(true);
     try easy.setHeaders(headers);
