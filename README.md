@@ -26,8 +26,14 @@ const libcurl = @import("path/to/libcurl.zig");
 pub fn build(b: *std.build.Builder) void {
     // ...
 
-    const lib = libcurl.create(b, target, mode);
+    const lib = libcurl.create(b, target, optimize);
 
+    const exe = b.addExecutable(.{
+        .name = "my-program",
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
     const exe = b.addExecutable("my-program", "src/main.zig");
     lib.link(exe, .{ .import_name = "curl" });
 }
