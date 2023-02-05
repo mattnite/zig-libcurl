@@ -31,18 +31,23 @@ pub const Library = struct {
         other.linkLibrary(self.step);
 
         if (opts.import_name) |import_name|
-            other.addPackagePath(import_name, package_path);
+            other.addAnonymousModule(
+                import_name,
+                .{ .source_file = .{ .path = package_path } },
+            );
     }
 };
 
 pub fn create(
     b: *std.build.Builder,
     target: std.zig.CrossTarget,
-    mode: std.builtin.Mode,
+    optimize: std.builtin.OptimizeMode,
 ) !Library {
-    const ret = b.addStaticLibrary("curl", null);
-    ret.setTarget(target);
-    ret.setBuildMode(mode);
+    const ret = b.addStaticLibrary(.{
+        .name = "curl",
+        .target = target,
+        .optimize = optimize,
+    });
     ret.addCSourceFiles(srcs, &.{});
     ret.addIncludePath(include_dir);
     ret.addIncludePath(lib_dir);
@@ -163,7 +168,7 @@ pub fn create(
         // Define if you want to enable WIN32 threaded DNS lookup
         //ret.defineCMacro("USE_THREADS_WIN32", "1");
 
-        return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
+        return Library{ .step = ret, .exported_defines = try exported_defines.toOwnedSlice() };
     }
 
     //ret.defineCMacro("libcurl_EXPORTS", null);
@@ -1005,7 +1010,7 @@ pub fn create(
     // to make the compiler know the prototypes of Windows IDN APIs
     // #undef WANT_IDN_PROTOTYPES
 
-    return Library{ .step = ret, .exported_defines = exported_defines.toOwnedSlice() };
+    return Library{ .step = ret, .exported_defines = try exported_defines.toOwnedSlice() };
 }
 
 const srcs = &.{
