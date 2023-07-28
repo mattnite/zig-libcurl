@@ -24,12 +24,8 @@ pub fn writeToFifo(comptime FifoType: type) WriteFn {
         fn writeFn(ptr: ?[*]u8, size: usize, nmemb: usize, data: ?*anyopaque) callconv(.C) usize {
             _ = size;
             var slice = (ptr orelse return 0)[0..nmemb];
-            const fifo = @as(
-                *FifoType,
-                @ptrCast(
-                    data orelse return 0,
-                ),
-            );
+            const fifo: *FifoType =
+                @ptrCast(@alignCast(data orelse return 0));
 
             fifo.writer().writeAll(slice) catch return 0;
             return nmemb;
@@ -47,12 +43,8 @@ pub fn readFromFbs(comptime FbsType: type) ReadFn {
     return struct {
         fn readFn(buffer: ?[*]u8, size: usize, nitems: usize, data: ?*anyopaque) callconv(.C) usize {
             const to = (buffer orelse return c.CURL_READFUNC_ABORT)[0 .. size * nitems];
-            var fbs = @as(
-                *std.io.FixedBufferStream(BufferType),
-                @ptrCast(
-                    data orelse return c.CURL_READFUNC_ABORT,
-                ),
-            );
+            var fbs: *std.io.FixedBufferStream(BufferType) =
+                @ptrCast(@alignCast(data orelse return c.CURL_READFUNC_ABORT));
 
             return fbs.read(to) catch |err| blk: {
                 std.log.err("get fbs read error: {s}", .{@errorName(err)});
