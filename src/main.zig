@@ -59,6 +59,7 @@ pub const Easy = opaque {
         return @as(?*Easy, @ptrCast(c.curl_easy_init())) orelse error.FailedInit;
     }
 
+    pub const deinit = cleanup;
     pub fn cleanup(self: *Easy) void {
         c.curl_easy_cleanup(self);
     }
@@ -301,7 +302,8 @@ pub const HeaderList = struct {
         };
     }
 
-    pub fn freeAll(self: *HeaderList) void {
+    pub const deinit = freeAll;
+    pub fn freeAll(self: @This()) void {
         c.curl_slist_free_all(self.inner);
     }
 
