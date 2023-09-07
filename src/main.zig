@@ -24,13 +24,8 @@ pub fn writeToFifo(comptime FifoType: type) WriteFn {
         fn writeFn(ptr: ?[*]u8, size: usize, nmemb: usize, data: ?*anyopaque) callconv(.C) usize {
             _ = size;
             var slice = (ptr orelse return 0)[0..nmemb];
-            const fifo = @ptrCast(
-                *FifoType,
-                @alignCast(
-                    @alignOf(*FifoType),
-                    data orelse return 0,
-                ),
-            );
+            const fifo: *FifoType =
+                @ptrCast(@alignCast(data orelse return 0));
 
             fifo.writer().writeAll(slice) catch return 0;
             return nmemb;
@@ -48,13 +43,8 @@ pub fn readFromFbs(comptime FbsType: type) ReadFn {
     return struct {
         fn readFn(buffer: ?[*]u8, size: usize, nitems: usize, data: ?*anyopaque) callconv(.C) usize {
             const to = (buffer orelse return c.CURL_READFUNC_ABORT)[0 .. size * nitems];
-            var fbs = @ptrCast(
-                *std.io.FixedBufferStream(BufferType),
-                @alignCast(
-                    @alignOf(*std.io.FixedBufferStream(BufferType)),
-                    data orelse return c.CURL_READFUNC_ABORT,
-                ),
-            );
+            var fbs: *std.io.FixedBufferStream(BufferType) =
+                @ptrCast(@alignCast(data orelse return c.CURL_READFUNC_ABORT));
 
             return fbs.read(to) catch |err| blk: {
                 std.log.err("get fbs read error: {s}", .{@errorName(err)});
@@ -66,9 +56,10 @@ pub fn readFromFbs(comptime FbsType: type) ReadFn {
 
 pub const Easy = opaque {
     pub fn init() Error!*Easy {
-        return @ptrCast(?*Easy, c.curl_easy_init()) orelse error.FailedInit;
+        return @as(?*Easy, @ptrCast(c.curl_easy_init())) orelse error.FailedInit;
     }
 
+    pub const deinit = cleanup;
     pub fn cleanup(self: *Easy) void {
         c.curl_easy_cleanup(self);
     }
@@ -134,11 +125,23 @@ pub const Easy = opaque {
     }
 
     pub fn setPostFields(self: *Easy, data: *anyopaque) Error!void {
-        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_POSTFIELDS, @ptrToInt(data)));
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_POSTFIELDS, @intFromPtr(data)));
     }
 
     pub fn setPostFieldSize(self: *Easy, size: usize) Error!void {
-        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_POSTFIELDSIZE, @intCast(c_ulong, size)));
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_POSTFIELDSIZE, @as(c_ulong, @intCast(size))));
+    }
+
+    pub fn setTimeout(self: *Easy, duration_seconds: c_ulong) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_TIMEOUT, duration_seconds));
+    }
+
+    pub fn setTimeoutMs(self: *Easy, duration_ms: c_ulong) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_TIMEOUT_MS, duration_ms));
+    }
+
+    pub fn setopt(self: *Easy, option: c.CURLoption, arg: c_ulong) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, option, arg));
     }
 
     pub fn perform(self: *Easy) Error!void {
@@ -233,44 +236,44 @@ test "https post" {
 
 pub const Url = opaque {
     pub fn init() UrlError!*Url {
-        return @ptrCast(?*Url, c.curl_url()) orelse error.FailedInit;
+        return @as(?*Url, @ptrCast(c.curl_url())) orelse error.FailedInit;
     }
 
     pub fn cleanup(self: *Url) void {
-        c.curl_url_cleanup(@ptrCast(*c.CURLU, self));
+        c.curl_url_cleanup(@as(*c.CURLU, @ptrCast(self)));
     }
 
     pub fn set(self: *Url, url: [:0]const u8) UrlError!void {
-        return tryCurlUrl(c.curl_url_set(@ptrCast(*c.CURLU, self), c.CURLUPART_URL, url.ptr, 0));
+        return tryCurlUrl(c.curl_url_set(@as(*c.CURLU, @ptrCast(self)), c.CURLUPART_URL, url.ptr, 0));
     }
 
     pub fn getHost(self: *Url) UrlError![*:0]u8 {
         var host: ?[*:0]u8 = undefined;
-        try tryCurlUrl(c.curl_url_get(@ptrCast(*c.CURLU, self), c.CURLUPART_HOST, &host, 0));
+        try tryCurlUrl(c.curl_url_get(@as(*c.CURLU, @ptrCast(self)), c.CURLUPART_HOST, &host, 0));
         return host.?;
     }
 
     pub fn getPath(self: *Url) UrlError![*:0]u8 {
         var path: ?[*:0]u8 = undefined;
-        try tryCurlUrl(c.curl_url_get(@ptrCast(*c.CURLU, self), c.CURLUPART_PATH, &path, 0));
+        try tryCurlUrl(c.curl_url_get(@as(*c.CURLU, @ptrCast(self)), c.CURLUPART_PATH, &path, 0));
         return path.?;
     }
 
     pub fn getScheme(self: *Url) UrlError![*:0]u8 {
         var scheme: ?[*:0]u8 = undefined;
-        try tryCurlUrl(c.curl_url_get(@ptrCast(*c.CURLU, self), c.CURLUPART_SCHEME, &scheme, 0));
+        try tryCurlUrl(c.curl_url_get(@as(*c.CURLU, @ptrCast(self)), c.CURLUPART_SCHEME, &scheme, 0));
         return scheme.?;
     }
 
     pub fn getPort(self: *Url) UrlError![*:0]u8 {
         var port: ?[*:0]u8 = undefined;
-        try tryCurlUrl(c.curl_url_get(@ptrCast(*c.CURLU, self), c.CURLUPART_PORT, &port, 0));
+        try tryCurlUrl(c.curl_url_get(@as(*c.CURLU, @ptrCast(self)), c.CURLUPART_PORT, &port, 0));
         return port.?;
     }
 
     pub fn getQuery(self: *Url) UrlError![*:0]u8 {
         var query: ?[*:0]u8 = undefined;
-        try tryCurlUrl(c.curl_url_get(@ptrCast(*c.CURLU, self), c.CURLUPART_QUERY, &query, 0));
+        try tryCurlUrl(c.curl_url_get(@as(*c.CURLU, @ptrCast(self)), c.CURLUPART_QUERY, &query, 0));
         return query.?;
     }
 
@@ -311,7 +314,8 @@ pub const HeaderList = struct {
         };
     }
 
-    pub fn freeAll(self: *HeaderList) void {
+    pub const deinit = freeAll;
+    pub fn freeAll(self: @This()) void {
         c.curl_slist_free_all(self.inner);
     }
 
