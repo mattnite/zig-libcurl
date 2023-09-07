@@ -140,6 +140,10 @@ pub const Easy = opaque {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_TIMEOUT_MS, duration_ms));
     }
 
+    pub fn setopt(self: *Easy, option: c.CURLoption, arg: c_ulong) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, option, arg));
+    }
+
     pub fn perform(self: *Easy) Error!void {
         return tryCurl(c.curl_easy_perform(self));
     }
