@@ -132,6 +132,14 @@ pub const Easy = opaque {
         return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_POSTFIELDSIZE, @as(c_ulong, @intCast(size))));
     }
 
+    pub fn setTimeout(self: *Easy, duration_seconds: c_ulong) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_TIMEOUT, duration_seconds));
+    }
+
+    pub fn setTimeoutMs(self: *Easy, duration_ms: c_ulong) Error!void {
+        return tryCurl(c.curl_easy_setopt(self, c.CURLOPT_TIMEOUT_MS, duration_ms));
+    }
+
     pub fn perform(self: *Easy) Error!void {
         return tryCurl(c.curl_easy_perform(self));
     }
